@@ -61,17 +61,23 @@
 
   // ---- views ----
   // N1 (sir-nitpickalot r2): the free/Pro split here is client-side on sample data, so it is NOT a paywall; the real one is backend RLS.
-  const PREVIEW = 'Preview: sample data, paywall not enforced';
+  const PREVIEW = 'Preview: paywall not enforced. Sentiment history uses stored data.';
   const DISC = 'Scores describe the expected size of a news story\u2019s market effect, from \u221210 to +10 on an exponential scale (each step \u2248 \u00d71.41, every 2 steps \u00d72). Calibration pending: the scale is not yet fitted to measured moves. Not investment advice. Past results do not predict future moves. Sample data.';
   const CAL = '<span class="cal">\u25C6 Calibration pending</span>';
   const timeOf = iso => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Oslo' });
   const dateOf = iso => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Europe/Oslo' });
 
+  // A18 + cz19: direct = scored tickers, then unscored linked stocks; a card with neither says so (no empty labelled group).
+  function tickHtml(c) {
+    const have = new Set(c.tickers.map(t => t.ticker)), extra = ((c.links || {}).direct || []).filter(t => !have.has(t));
+    const chips = c.tickers.map(t => I.chipHtml(t.ticker, t.s)).concat(extra.map(t => I.chipHtml(t, null))).join('');
+    return chips ? `<div class="tick" aria-label="Linked stocks: direct">${chips}</div>` : '<div class="tick"><span class="sub">No linked ticker yet</span></div>';
+  }
   function card(c) {
     return `<article class="card ${I.tone(c.s)}" data-score="${c.s}" data-date="${dateOf(c.published_at)}">${I.badgeHtml(c.s)}` +
       `<div><h3><a href="#/cluster/${esc(c.id)}">${esc(c.title)}</a></h3><p>${esc(c.summary)}</p>` +
-      `<div class="meta"><span>${esc(Ti.tierLabel(c.s))}${c.n_entries > 1 ? ' \u00b7 ' + esc(Ti.countText(c.n_entries)) : ''} \u00b7 ${c.sources} sources \u00b7 ${esc(c.sector)} \u00b7 ${c.market} \u00b7 ${timeOf(c.published_at)} Oslo</span></div></div>` +
-      `<div class="tick" aria-label="Linked tickers">${c.tickers.map(t => I.chipHtml(t.ticker, t.s)).join('')}</div></article>`;
+      `<div class="meta"><span>${esc(Ti.tierLabel(c.s))}${c.n_entries > 1 ? ' \u00b7 ' + esc(Ti.countText(c.n_entries)) : ''} \u00b7 ${c.sources} sources \u00b7 ${esc(c.sector)} \u00b7 ${c.market} \u00b7 ${timeOf(c.published_at)} Oslo</span></div>` +
+      `${PM.linksHtml(c, false, true)}</div>` + tickHtml(c) + '</article>';
   }
   function paywall(n) {
     return `<section class="wall" aria-labelledby="wall-h"><h3 id="wall-h">Today\u2019s ${n} clusters are locked</h3>` +
@@ -107,7 +113,7 @@
     return `<a class="back" href="#/feed">\u2190 Clusters</a><div class="head"><div><h1>&gt; Cluster</h1><div class="sub">${dateOf(c.published_at)} ${timeOf(c.published_at)} Oslo \u00b7 ${c.market} \u00b7 ${esc(c.sector)}</div></div></div>` +
       `<div class="list"><article class="card hero ${I.tone(c.s)}">${I.badgeHtml(c.s)}<div><h3>${esc(c.title)}</h3><p>${esc(c.summary)}</p></div></article></div>` +
       `<div class="det-grid"><div><h2>// Linked tickers</h2><div class="tw"><table><thead><tr><th>Ticker</th><th class="r">Impact</th><th>Evidence</th><th>Novelty</th><th class="r">Move since publish</th></tr></thead><tbody>${rows}</tbody></table></div>` +
-      `<p class="note">Move since publish uses the price stamped at publish (CF1/CF2-safe, js/calc.js); n/a when missing.</p>${extrasHtml(c.tickers.map(t => t.ticker))}</div>` +
+      `<p class="note">Move since publish uses the price stamped at publish (CF1/CF2-safe, js/calc.js); n/a when missing.</p>${PM.linksHtml(c, true)}${extrasHtml(c.tickers.map(t => t.ticker))}</div>` +
       `<div><h2>// Sources</h2><div class="src">${srcs}</div><h2>// Score record</h2><dl class="kv"><dt>Model</dt><dd>${esc(c.model_id)}</dd><dt>Rubric</dt><dd>${esc(c.rubric_version)}</dd><dt>Mapping</dt><dd>${esc(c.mapping_version)}</dd><dt>Scored at</dt><dd><time datetime="${esc(c.scored_at || c.published_at)}" title="${esc(c.scored_at || c.published_at)}">${dateOf(c.scored_at || c.published_at)} ${timeOf(c.scored_at || c.published_at)} Oslo</time></dd><dt>Calibration</dt><dd>${CAL}</dd></dl></div></div>`;
   }
   function viewTrack(st) {

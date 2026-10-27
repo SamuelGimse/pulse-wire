@@ -168,3 +168,10 @@ td.tcol{min-width:120px}
 .preview-note{font:12px var(--mono);color:var(--cp-scan);border:1px dashed var(--line);padding:4px 8px;margin:0 0 12px}  /* N1 preview-only paywall note */
 .card>div:only-child{grid-column:1/-1}  /* P0.2-P0.8 cards without an impact badge span the full width */
 .railmv .tk{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}.railmv+p a{display:inline-flex;align-items:center;min-height:44px}  /* DA14 44px targets (P0.6 rail module) */
+/* A17 theme sentiment chart (inline SVG, no library) */
+.schart{margin:0 0 var(--s-6);color:var(--cp-green)}.schart svg{width:100%;height:auto;max-height:160px;display:block;border:1px solid var(--line)}
+.schart .zero{stroke:var(--line)}.schart .mark{stroke:var(--cp-scan);stroke-dasharray:3 3}.schart text{fill:var(--cp-scan);font-size:10px}.schart circle{fill:currentColor}.schart figcaption{font-size:12px;color:var(--cp-idle);margin-top:4px}
+/* A18 linked stocks (t296u) */
+.links{margin-top:8px}.links h4{font:12px var(--mono);margin:6px 0 2px}
+.lk{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0}.lk-l{font:12px var(--mono);color:var(--cp-idle)}
+.lk-t,.lk-why{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}.lk-why{display:block}.lk-why li{margin:2px 0}
