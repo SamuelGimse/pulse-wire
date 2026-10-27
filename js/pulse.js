@@ -109,7 +109,7 @@
   function viewFeed(st) {
     const list = sortClusters(st.visible, st.sort);
     const lockedN = st.role === 'free' ? st.all.length - st.visible.length : 0;
-    const head = `<div class="head"><div><h1>&gt; Clusters</h1><div class="sub">${st.role === 'free' ? 'Free \u00b7 previous trading day only' : st.live === true ? 'Today \u00b7 live' : 'Today \u00b7 sample'} \u00b7 sorted by ${st.sort === 'impact' ? '|impact|' : st.sort} \u00b7 ${list.length} shown</div></div><span class="sp"></span>` +
+    const head = `<div class="head"><div><h1>Today’s clusters</h1><div class="sub">${st.role === 'free' ? 'Free \u00b7 previous trading day only' : st.live === true ? 'Live market feed' : 'Sample feed'} \u00b7 sorted by ${st.sort === 'impact' ? 'impact' : st.sort} \u00b7 ${list.length} shown</div></div><span class="sp"></span>` +
       `<div class="seg" role="group" aria-label="Sort">${['impact', 'newest', 'coverage'].map(m => `<button type="button" data-sort="${m}" aria-pressed="${st.sort === m}">${m}</button>`).join('')}</div></div>`;
     const cards = CL.cardsHtml(list, Object.assign({ themes: PH_DATA().themes, markets: root.PULSE_MARKETS, clusterMap: (root.PULSE_PACKAGE || {}).clusterMap }, st));
     const body = (list.length ? '' : `<div class="empty">No clusters from the previous trading day.</div>`) + cards;

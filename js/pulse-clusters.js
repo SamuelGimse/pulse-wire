@@ -47,22 +47,25 @@
   function historyHtml(rows, role) {
     if (!rows.length) return '<p class="sub">No stance history yet.</p>';
     const shown = role === 'pro' ? rows : rows.slice(0, 3), more = rows.length - shown.length, head = shown.slice(0, SHOWN), rest = shown.slice(SHOWN), id = `hist${++histN}`;
-    return `<div class="hist"><h4>Stance history ${sparkline(shown)}</h4><p class="sub">Price moves: n/a (no quote source yet)</p>` +
+    const panel = `hist-panel-${id}`;
+    return `<details class="hist"><summary><span>Stance history</span>${sparkline(shown)}<span class="hist-count">${shown.length}${more ? '+' : ''} points</span></summary><div class="hist-body" id="${panel}"><p class="sub">Price moves: n/a (no quote source yet)</p>` +
       `<table class="hist-t"><caption class="sr">Stance history, newest first</caption><thead><tr><th scope="col">Date</th><th scope="col">Stance</th><th scope="col" class="r">Impact</th><th scope="col" class="r">Change</th></tr></thead>` +
       `<tbody>${head.map(hrow).join('')}</tbody>${rest.length ? `<tbody id="${id}" hidden>${rest.map(hrow).join('')}</tbody>` : ''}</table>` +
       (rest.length ? `<button type="button" class="btn sec toggle" aria-expanded="false" aria-controls="${id}" data-open="Show fewer" data-closed="Show all (${shown.length})">Show all (${shown.length})</button>` : '') +
-      (more ? `<p class="sub">${more} older publish${more === 1 ? '' : 'es'} with Pro.</p>` : '') + '</div>';
+      (more ? `<p class="sub">${more} older publish${more === 1 ? '' : 'es'} with Pro.</p>` : '') + '</div></details>';
   }
   let artN = 0;
+  const ratingHtml = value => Number.isInteger(value) && value >= -10 && value <= 10
+    ? `<span class="article-rating ${value > 0 ? 'is-positive' : value < 0 ? 'is-negative' : 'is-neutral'}" aria-label="Article rating ${value > 0 ? '+' : ''}${value} out of 10">${value > 0 ? '+' : ''}${value}<span>/10</span></span>` : '';
   function articlesHtml(c) {
     if (!Array.isArray(c.articles)) return '<p class="sub">No article list stored for this publish</p>';
     const id = `arts${++artN}`, a = c.articles;
     return `<button type="button" class="btn sec toggle toggle-arts" aria-expanded="false" aria-controls="${id}" data-open="Hide articles (${a.length})" data-closed="Show articles (${a.length})">Show articles (${a.length})</button>` +
       `<div class="arts" id="${id}" hidden>${a.map(x => { const u = safeUrl(x.link);
-        return `<div class="art"><h4>${esc(x.title)}</h4><p class="sub">${esc(x.source)}${x.date ? ` \u00b7 ${esc(x.date)}` : ''}</p>${x.short_summary ? `<p>${esc(x.short_summary)}</p>` : ''}` +
-          (u ? `<a class="read" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Read \u2192</a>` : '') + '</div>'; }).join('')}</div>`;
+        return `<article class="art"><div class="art-head"><h4>${esc(x.title)}</h4>${ratingHtml(x.rating)}</div><p class="sub">${esc(x.source)}${x.date ? ` \u00b7 ${esc(x.date)}` : ''}</p>${x.short_summary ? `<p>${esc(x.short_summary)}</p>` : ''}` +
+          (u ? `<a class="read" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Read \u2192</a>` : '') + '</article>'; }).join('')}</div>`;
   }
-  const chips = xs => (xs.length ? xs.map(t => I.chipHtml(t, null)).join('') : '<span class="sub">None mapped</span>');
+  const chips = xs => (xs.length ? xs.map(t => I.chipHtml(t, null)).join('') : '<span class="sub">No stocks linked yet</span>');
   /** One card; c = a current cluster (or a default theme with no current event: {title, market, theme_id, stocks}). */
   function cardHtml(c, hist, role) {
     const L = c.links || {}, linked = [...new Set([...(L.default || []), ...(L.mentioned || []), ...(c.tickers || []).map(t => t.ticker)])];
@@ -75,11 +78,13 @@
   }
   /** Current clusters first (given order), then default clusters of the shown markets that have no current event. */
   function cardsHtml(list, st) {
-    const themes = st.themes || [], map = st.clusterMap, seen = new Set();
-    const cur = list.map(c => { const key = keyOf(c, map); seen.add(key); return cardHtml(Object.assign({}, c, { key, current: true }), historyFor(key, themes, st.history), st.role); });
-    const rest = themes.filter(t => !seen.has(t.theme_id) && (!st.markets || st.markets.includes(t.market)))
-      .map(t => cardHtml({ key: t.theme_id, title: t.name, market: t.market, links: { default: t.tickers } }, historyFor(t.theme_id, themes, st.history), st.role));
-    return cur.concat(rest).join('\n');
+    const themes = st.themes || [], map = st.clusterMap;
+    // The live feed is today's events. Historical theme-only rows belong on the Themes view,
+    // where they have context, instead of being mixed into today's results.
+    return list.map(c => {
+      const key = keyOf(c, map);
+      return cardHtml(Object.assign({}, c, { key, current: true }), historyFor(key, themes, st.history), st.role);
+    }).join('\n');
   }
   /** Delegated click: the articles and history toggles flip aria-expanded, the label and the panel's hidden flag. */
   function wire(app) {

@@ -19,7 +19,7 @@
   const num = v => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-10, Math.min(10, Math.round(v))) : 0);
   const str = v => (typeof v === 'string' ? v : '');
   // t344s1271: only the 5 article fields, strings only; no articles[] stays undefined ('No article list stored')
-  const arts = a => (Array.isArray(a) ? a.filter(x => x && typeof x === 'object').map(x => ({ title: str(x.title), source: str(x.source), date: str(x.date), link: str(x.link), short_summary: str(x.short_summary) })) : undefined);
+  const arts = a => (Array.isArray(a) ? a.filter(x => x && typeof x === 'object').map(x => ({ title: str(x.title), source: str(x.source), date: str(x.date), link: str(x.link), short_summary: str(x.short_summary), ...(Number.isInteger(x.rating) && x.rating >= -10 && x.rating <= 10 ? { rating: x.rating } : {}) })) : undefined);
   /** One publishes row -> PULSE clusters. Own-words fields plus articles[] when stored. */
   function toClusters(row) {
     return (Array.isArray(row.groups_json) ? row.groups_json : []).filter(g => g && g.name && g.summary).map((g, i) => {
