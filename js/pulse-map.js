@@ -16,7 +16,7 @@
     const panel = sel ? `<h2>// Clusters mentioning ${esc(sel)}</h2><div class="list">${m.get(sel).map(c => `<a class="card" href="#/cluster/${esc(c.id)}"><div><h3>${esc(c.title)}</h3><p class="sub">${esc(Ti.tierLabel(c.s))} \u00b7 ${esc(c.market)}</p></div></a>`).join('')}</div>` : '';
     return `<div class="head"><div><h1>&gt; Event map</h1><div class="sub">Countries in the clusters \u00b7 <span class="tag">Sample data</span></div></div></div>` +
       `<div id="pmap" role="application" aria-label="Event map" style="height:50vh;min-height:280px;border:1px solid var(--line);margin-bottom:12px"></div>` +
-      `<p id="pmap-fail" class="note" hidden>Map unavailable; events by country:</p><ul class="days" id="pmap-list">${list || '<li>No clusters in your tier\u2019s data.</li>'}</ul>${panel}`;
+      `<p id="pmap-fail" class="note" hidden>Map unavailable; events by country:</p><ul class="days" id="pmap-list">${list || `<li class="empty-row">${st.role === 'free' ? 'No stories from the previous trading day' : 'No clusters in your tier\u2019s data.'}</li>`}</ul>${panel}`;
   }
   let inst = null;
   function fail(doc) { const el = doc.getElementById('pmap'), f = doc.getElementById('pmap-fail'); if (el) el.hidden = true; if (f) f.hidden = false; }
@@ -32,7 +32,8 @@
       const el = doc.getElementById('pmap'); if (!el) return;
       if (!ok) return fail(doc);
       try {
-        const gl = root.maplibregl, map = new gl.Map({ container: el, style: src.style, center: [10, 45], zoom: 1.3, attributionControl: false });
+        const gl = root.maplibregl, map = new gl.Map({ container: el, style: src.style, ...(root.PULSE_MARKETS && !root.PULSE_MARKETS.includes('NO') ? { center: [-96, 38], zoom: 2.4 } : { center: [10, 45], zoom: 1.3 }),   // nice 28: US-only -> US view
+           attributionControl: false });
         map.addControl(new gl.AttributionControl({ compact: false, customAttribution: src.attribution }), 'bottom-right');   // always visible
         map.on('error', () => fail(doc));   // shortcut: any style/tile error -> list only (G23d)
         for (const [k, cs] of byCountry(st.visible)) {

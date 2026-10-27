@@ -30,16 +30,16 @@
     if (!c) return `<span class="nostory">No story in our feed for this window</span>`;
     if (!(st.visible || []).some(x => x.id === c.id)) return `<a class="lockrow" href="#/account">\u25A3 Story in today\u2019s feed \u00b7 Pro</a>`;   // shortcut: any non-visible story uses this wording
     const t = Ti.tier(c.s), tl = t === Ti.NONE ? 'UNSCORED' : t.toUpperCase();
-    return `<div class="wiim"><a href="#/cluster/${esc(c.id)}">${esc(c.title)}</a><div class="meta sub"><span class="tb">\u25AE ${tl}</span> ${esc(c.sector || '')} \u00b7 in our feed <time datetime="${esc(c.published_at)}" title="${esc(oslo(c.published_at))}">${ago(c.published_at, st.now)}</time></div>${linksHtml(c, false)}</div>`;
+    return `<div class="wiim"><a href="#/cluster/${esc(c.id)}">${esc(c.title)}</a><div class="meta sub"><span class="tb">\u25AE ${tl}</span> ${esc(c.sector || '')} \u00b7 in our feed <time datetime="${esc(c.published_at)}" title="${esc(oslo(c.published_at))}">${ago(c.published_at, st.now)}</time></div>${linksHtml(c)}</div>`;
   }
-  // A18 linked stocks (t296u): tickers + our own 'why linked' words only. DA9: no advice words. full = with 'Why linked'.
+  // t305u linked stocks: Mentioned (our ticker DB matches) + Default (theme basket). Tickers only; DA9: no advice words.
+  // skipMentioned: the feed card already shows mentioned stocks as chips (pulse.js tickHtml).
   let lkN = 0;
-  function linksHtml(c, full, skipDirect) {
-    const L = c.links || {}, direct = skipDirect ? [] : L.direct || [], second = L.second || [], why = full ? L.why || [] : [];
-    if (!direct.length && !second.length) return '';
+  function linksHtml(c, skipMentioned) {
+    const L = c.links || {}, mentioned = skipMentioned ? [] : L.mentioned || [], def = L.default || [];
+    if (!mentioned.length && !def.length) return '';
     const list = (lab, xs) => { const id = `lk${++lkN}`; return xs.length ? `<div class="lk"><span class="lk-l" id="${id}">${lab}</span><ul class="lk-t" aria-labelledby="${id}">${xs.map(t => `<li><a class="tk" href="#/ticker/${encodeURIComponent(t)}">${esc(t)}</a></li>`).join('')}</ul></div>` : ''; };
-    return `<div class="links">${list('Linked stocks: direct', direct)}${list('Linked stocks: second-order', second)}` +
-      (why.length ? `<h4>Why linked</h4><ul class="lk-why">${why.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : '') + '<p class="sub">Context, not advice.</p></div>';
+    return `<div class="links" role="group" aria-label="Linked stocks">${list('Mentioned', mentioned)}${list('Default', def)}<p class="sub">Context, not advice.</p></div>`;
   }
   const row = (m, st) => `<li class="mrow ${({ up: 'up', down: 'dn', flat: 'fl' })[signOf(m)]}"><a class="tk" href="#/ticker/${encodeURIComponent(m.symbol)}">${esc(m.symbol)}</a>${moveHtml(m)}${storyHtml(m, st)}</li>`;
   const EMPTY = { active: 'No moves yet for this session. Quotes update after the market opens.', winners: 'No tickers are up this session.', losers: 'No tickers are down this session.' };

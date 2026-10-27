@@ -6,7 +6,18 @@
     if (!store || store.live !== true || !Array.isArray(store.clusters) || !store.clusters.length) return Object.assign(data, { live: false });
     return Object.assign(data, { clusters: store.clusters, charts: store.charts || {}, live: true, updated_at: store.updated_at, demoNow: new Date().toISOString() });
   }
-  const api = { applyStore };
+  // nice 28 (user t309): show only the enabled markets (window.PULSE_MARKETS from js/pulse-markets.js, generated from pipeline
+  // config.js MARKETS). Hides, never deletes: the sample/live data of an off market stays in the files. No list = all markets.
+  const marketOf = (sym) => (/\.OL$/i.test(String(sym)) ? 'NO' : 'US');   // shortcut: track rows carry no market; Oslo symbols end in .OL
+  function applyMarkets(markets, data, history, summary) {
+    if (!Array.isArray(markets)) return;
+    const on = (m) => markets.includes(m);
+    if (data) Object.assign(data, { clusters: (data.clusters || []).filter(c => on(c.market)), movers: (data.movers || []).filter(m => on(m.market || marketOf(m.symbol))),
+      track: (data.track || []).filter(t => on(marketOf(t.ticker))) });
+    if (history) Object.assign(history, { themes: (history.themes || []).filter(t => on(t.market)), publishes: (history.publishes || []).filter(p => on(p.market)) });
+    if (summary) Object.assign(summary, { briefs: (summary.briefs || []).filter(b => on(b.market)) });
+  }
+  const api = { applyStore, applyMarkets, marketOf };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  if (root) { root.PulseSource = api; if (root.PulseData) applyStore(root.PulseData, root.PULSE_STORE); }
+  if (root) { root.PulseSource = api; if (root.PulseData) applyStore(root.PulseData, root.PULSE_STORE); applyMarkets(root.PULSE_MARKETS, root.PulseData, root.PulseHistoryData, root.PulseSummaryData); }
 })(typeof window !== 'undefined' ? window : null);

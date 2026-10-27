@@ -61,23 +61,28 @@
 
   // ---- views ----
   // N1 (sir-nitpickalot r2): the free/Pro split here is client-side on sample data, so it is NOT a paywall; the real one is backend RLS.
-  const PREVIEW = 'Preview: paywall not enforced. Sentiment history uses stored data.';
+  // cz29: the banner says what the page shows: sample data (Pages default package, or no live publish yet) vs live store data.
+  const PREVIEW_SAMPLE = 'Preview: sample data. Paywall not enforced.', PREVIEW_SAMPLE_PAID = 'Preview: sample data. Showing paid tier. Paywall not enforced.', PREVIEW_LIVE = 'Preview: paywall not enforced. Feed from our latest run; sentiment history from stored data.';
+  const proLabel = st => (st.live === true ? 'PRO \u00b7 LIVE' : 'PRO \u00b7 SAMPLE');   // cz34: LIVE only with live store data
+  const previewText = st => (st.live === true ? PREVIEW_LIVE : st.paidDefault && st.role === 'pro' ? PREVIEW_SAMPLE_PAID : PREVIEW_SAMPLE);
+  /** t312u: default tier from the package config (window.PULSE_PACKAGE.defaultTier, Pages = 'pro'); an explicit ?tier= wins; else free. */
+  const defaultRole = (tierParam, pkg) => (tierParam === 'pro' || tierParam === 'free' ? tierParam : pkg && pkg.defaultTier === 'pro' ? 'pro' : 'free');
   const DISC = 'Scores describe the expected size of a news story\u2019s market effect, from \u221210 to +10 on an exponential scale (each step \u2248 \u00d71.41, every 2 steps \u00d72). Calibration pending: the scale is not yet fitted to measured moves. Not investment advice. Past results do not predict future moves. Sample data.';
   const CAL = '<span class="cal">\u25C6 Calibration pending</span>';
   const timeOf = iso => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Oslo' });
   const dateOf = iso => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Europe/Oslo' });
 
-  // A18 + cz19: direct = scored tickers, then unscored linked stocks; a card with neither says so (no empty labelled group).
+  // t305u + cz19: mentioned = scored tickers, then unscored mentioned stocks; a card with neither says so (no empty labelled group).
   function tickHtml(c) {
-    const have = new Set(c.tickers.map(t => t.ticker)), extra = ((c.links || {}).direct || []).filter(t => !have.has(t));
+    const have = new Set(c.tickers.map(t => t.ticker)), extra = ((c.links || {}).mentioned || []).filter(t => !have.has(t));
     const chips = c.tickers.map(t => I.chipHtml(t.ticker, t.s)).concat(extra.map(t => I.chipHtml(t, null))).join('');
-    return chips ? `<div class="tick" aria-label="Linked stocks: direct">${chips}</div>` : '<div class="tick"><span class="sub">No linked ticker yet</span></div>';
+    return chips ? `<div class="tick" aria-label="Mentioned stocks">${chips}</div>` : '<div class="tick"><span class="sub">No mentioned stock</span></div>';
   }
   function card(c) {
     return `<article class="card ${I.tone(c.s)}" data-score="${c.s}" data-date="${dateOf(c.published_at)}">${I.badgeHtml(c.s)}` +
       `<div><h3><a href="#/cluster/${esc(c.id)}">${esc(c.title)}</a></h3><p>${esc(c.summary)}</p>` +
       `<div class="meta"><span>${esc(Ti.tierLabel(c.s))}${c.n_entries > 1 ? ' \u00b7 ' + esc(Ti.countText(c.n_entries)) : ''} \u00b7 ${c.sources} sources \u00b7 ${esc(c.sector)} \u00b7 ${c.market} \u00b7 ${timeOf(c.published_at)} Oslo</span></div>` +
-      `${PM.linksHtml(c, false, true)}</div>` + tickHtml(c) + '</article>';
+      `${PM.linksHtml(c, true)}</div>` + tickHtml(c) + '</article>';
   }
   function paywall(n) {
     return `<section class="wall" aria-labelledby="wall-h"><h3 id="wall-h">Today\u2019s ${n} clusters are locked</h3>` +
@@ -113,7 +118,7 @@
     return `<a class="back" href="#/feed">\u2190 Clusters</a><div class="head"><div><h1>&gt; Cluster</h1><div class="sub">${dateOf(c.published_at)} ${timeOf(c.published_at)} Oslo \u00b7 ${c.market} \u00b7 ${esc(c.sector)}</div></div></div>` +
       `<div class="list"><article class="card hero ${I.tone(c.s)}">${I.badgeHtml(c.s)}<div><h3>${esc(c.title)}</h3><p>${esc(c.summary)}</p></div></article></div>` +
       `<div class="det-grid"><div><h2>// Linked tickers</h2><div class="tw"><table><thead><tr><th>Ticker</th><th class="r">Impact</th><th>Evidence</th><th>Novelty</th><th class="r">Move since publish</th></tr></thead><tbody>${rows}</tbody></table></div>` +
-      `<p class="note">Move since publish uses the price stamped at publish (CF1/CF2-safe, js/calc.js); n/a when missing.</p>${PM.linksHtml(c, true)}${extrasHtml(c.tickers.map(t => t.ticker))}</div>` +
+      `<p class="note">Move since publish uses the price stamped at publish (CF1/CF2-safe, js/calc.js); n/a when missing.</p>${PM.linksHtml(c)}${extrasHtml(c.tickers.map(t => t.ticker))}</div>` +
       `<div><h2>// Sources</h2><div class="src">${srcs}</div><h2>// Score record</h2><dl class="kv"><dt>Model</dt><dd>${esc(c.model_id)}</dd><dt>Rubric</dt><dd>${esc(c.rubric_version)}</dd><dt>Mapping</dt><dd>${esc(c.mapping_version)}</dd><dt>Scored at</dt><dd><time datetime="${esc(c.scored_at || c.published_at)}" title="${esc(c.scored_at || c.published_at)}">${dateOf(c.scored_at || c.published_at)} ${timeOf(c.scored_at || c.published_at)} Oslo</time></dd><dt>Calibration</dt><dd>${CAL}</dd></dl></div></div>`;
   }
   function viewTrack(st) {
@@ -133,7 +138,7 @@
       `${extrasHtml([tk])}<div class="list">${list.map(card).join('') || '<div class="empty">No clusters for this ticker in your tier\u2019s data.</div>'}</div>`;
   }
   const viewWatch = st => `<div class="head"><div><h1>&gt; Watchlist</h1><div class="sub">Tickers you follow (local sample)</div></div></div><div class="list rail-list">${st.watch.map(t => I.chipHtml(t, null)).join('')}</div>`;
-  const viewAccount = st => `<div class="head"><div><h1>&gt; Account</h1><div class="sub">Plan: ${st.role === 'pro' ? 'PRO \u00b7 LIVE' : 'FREE \u00b7 PREVIOUS TRADING DAY'}</div></div></div>` +
+  const viewAccount = st => `<div class="head"><div><h1>&gt; Account</h1><div class="sub">Plan: ${st.role === 'pro' ? proLabel(st) : 'FREE \u00b7 PREVIOUS TRADING DAY'}</div></div></div>` +
     (st.role === 'free' ? `<section class="wall" aria-labelledby="acc-h"><h3 id="acc-h">Pro \u00b7 99 kr/month</h3><p>Live clusters as they are scored. Cancel any time. Payments are not wired in this build.</p><a class="btn primary" href="#/account" aria-disabled="true">Upgrade to Pro \u00b7 99 kr/month</a></section>` : '<p class="sub">You have Pro.</p>');
 
   function render(st) {
@@ -147,21 +152,27 @@
     const phone = nav.filter(([k]) => ['feed', 'track', 'watchlist', 'more'].includes(k));   // design-pg10 §5: 4 phone tabs
     const q = st.role === 'pro' ? '?tier=pro' : '?tier=free';
     return `<a class="skip" href="#main">Skip to content</a><div class="frame">` +
-      `<header class="top"><span class="brand">PULSE<b>//</b>WIRE</span><span class="ctx">news impact \u00b7 NO + US</span><span class="sp"></span>${CAL}` +
-      `<span class="tier ${st.role === 'pro' ? 'paid' : 'free'}">${st.role === 'pro' ? 'PRO \u00b7 LIVE' : 'FREE \u00b7 PREVIOUS TRADING DAY'}</span>` +
+      `<header class="top"><span class="brand">PULSE<b>//</b>WIRE</span><span class="ctx">news impact \u00b7 ${esc((root.PULSE_MARKETS || ['NO', 'US']).join(' + '))}</span><span class="sp"></span>${CAL}` +
+      `<span class="tier ${st.role === 'pro' ? 'paid' : 'free'}">${st.role === 'pro' ? proLabel(st) : 'FREE \u00b7 PREVIOUS TRADING DAY'}</span>` +
       (st.role === 'free' ? `<a class="btn sec" href="#/account">Upgrade \u00b7 99 kr/month</a>` : '') + `</header>` +
       `<nav class="side" aria-label="Primary"><div class="grp">// VIEWS</div>${nav.map(([k, n]) => `<a href="${q}#/${k}"${k === cur ? ' aria-current="page"' : ''}>${n}</a>`).join('')}<a class="theme-link" href="${q}#/more">\u25D0 Theme: ${TH.nameOf(st.theme || TH.DEFAULT)}</a></nav>` +
-      `<main id="main" tabindex="-1"><p class="preview-note" role="note">${PREVIEW}</p><p class="calm">${CAL}</p>${main}<p class="disc">${DISC}</p></main>` +
+      `<main id="main" tabindex="-1"><p class="preview-note" role="note">${previewText(st)}</p><p class="calm">${CAL}</p>${main}<p class="disc">${DISC}</p></main>` +
       `<aside class="rail" aria-label="Context">${rail(st)}</aside></div>` +
       `<nav class="tabbar" aria-label="Primary (phone)">${phone.map(([k, , s]) => `<a href="${q}#/${k}"${k === cur ? ' aria-current="page"' : ''}>${s}</a>`).join('')}</nav>`;
   }
 
+  // t318u: the Pages package (PULSE_PACKAGE.remote) loads the live feed from Supabase first; failure/empty -> sample, labelled.
   function boot() {
+    const pkg = root.PULSE_PACKAGE, R = root.PulseRemote;
+    if (pkg && pkg.remote && R) return R.apply(root.PulseData).then(start, start);
+    start();
+  }
+  function start() {
     const qs = new URLSearchParams(location.search), D = root.PulseData;
-    const role = qs.get('tier') === 'pro' ? 'pro' : 'free';
+    const role = defaultRole(qs.get('tier'), root.PULSE_PACKAGE), paidDefault = !!(root.PULSE_PACKAGE && root.PULSE_PACKAGE.defaultTier === 'pro');
     const now = new Date(qs.get('now') || D.demoNow);
-    const st = { role, now, all: D.clusters, visible: forRole(D.clusters, role, now), track: D.track, movers: D.movers, sort: 'impact', filter: 'all',
-      watch: ['EQNR.OL', 'NVDA', 'TSLA', 'DNB.OL'], hash: location.hash, theme: TH.read(root.localStorage) };
+    const st = { role, now, live: D.live === true, paidDefault, all: D.clusters, visible: forRole(D.clusters, role, now), track: D.track, movers: D.movers, sort: 'impact', filter: 'all',
+      watch: ['EQNR.OL', 'NVDA', 'TSLA', 'DNB.OL'].filter(s => !root.PULSE_MARKETS || root.PULSE_MARKETS.includes(root.PulseSource.marketOf(s))), hash: location.hash, theme: TH.read(root.localStorage) };
     const app = document.getElementById('app');
     const draw = () => { st.hash = location.hash || '#/feed'; app.innerHTML = render(st); if (/^#\/map(\/|$)/.test(st.hash)) PMAP.mount(document, st); };   // P0.8: map loads only on its view
     TH.wire(document, root.localStorage, () => { st.theme = TH.read(root.localStorage); draw(); });
@@ -173,6 +184,6 @@
     window.addEventListener('hashchange', () => { draw(); window.scrollTo(0, 0); });
     draw();
   }
-  const api = { forRole, sortClusters, wilson, trackStats, render, extrasHtml };
+  const api = { forRole, sortClusters, wilson, trackStats, render, extrasHtml, defaultRole, PREVIEW_SAMPLE, PREVIEW_SAMPLE_PAID, PREVIEW_LIVE };
   if (isNode) module.exports = api; else { root.Pulse = api; document.addEventListener('DOMContentLoaded', boot); }
 })(typeof window !== 'undefined' ? window : globalThis);
