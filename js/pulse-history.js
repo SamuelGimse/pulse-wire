@@ -7,9 +7,11 @@
   const esc = x => String(x == null ? '' : x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const when = iso => new Date(iso).toLocaleString('en-GB', { timeZone: 'Europe/Oslo', weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) + ' Oslo';
   const pct = v => v == null ? 'n/a' : `${v > 0 ? '+' : v < 0 ? '\u2212' : ''}${Math.abs(v).toFixed(2)}%`;
-  const SAMPLE = '<span class="tag">Sample data</span>', tag = d => (d.sample === false ? '' : ` \u00b7 ${SAMPLE}`);   // A17: real data drops the tag
+  const SAMPLE = '<span class="tag">Sample data</span>', tag = d => (d.sample === false ? ' \u00b7 <span class="tag">Stored publishes</span>' : ` \u00b7 ${SAMPLE}`);   // t338: label follows the data source
   const DESC = 'Descriptive only: equal-weight basket move of the theme\u2019s fixed stocks between publishes (not benchmark-adjusted, not a performance claim, not investment advice).';
-  const emptyText = d => `History starts ${esc(d.launch_date)}.`;   // A14-10 day-1 empty state
+  // t338: the start date comes from the publishes actually shown (after the market filter), not from a fixed launch date
+  const startOf = d => { const ts = (d.publishes || []).map(p => Date.parse(p.publish_ts)).filter(Number.isFinite); return ts.length ? new Date(Math.min(...ts)).toLocaleDateString('en-CA', { timeZone: 'Europe/Oslo' }) : null; };
+  const emptyText = d => (startOf(d) ? `No publish for this theme yet. History starts ${esc(startOf(d))}.` : 'No history yet.');   // A14-10 day-1 empty state
 
   /** Split a theme's rows for the role: free sees only the previous trading day's publishes; the rest is counted and hidden.
    *  PREVIEW ONLY (N1): the sample data is all in the client, so this is not a paywall; the real one is server-side RLS (paywall.sql). */
@@ -48,6 +50,6 @@
     return `${back}<div class="head"><div><h1>&gt; ${esc(t.name)}</h1><div class="sub">${esc(t.market)} \u00b7 fixed stocks ${esc(t.tickers.join(', '))} \u00b7 ${st.role === 'free' ? esc(Cal.FREE_LABEL) : 'All publishes'}${tag(d)}</div></div></div>` +
       `${body}${lock}<p class="note">${DESC}</p>`;
   }
-  const api = { visible, viewThemes, viewTheme, chart, DESC };
+  const api = { visible, viewThemes, viewTheme, chart, startOf, emptyText, tag, DESC };
   if (isNode) module.exports = api; else root.PulseHistory = api;
 })(typeof window !== 'undefined' ? window : globalThis);

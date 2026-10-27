@@ -1,4 +1,4 @@
-/** @fileoverview P0.7 / A15.10 theme picker (design-pg10.md, user t253): exactly 6 dark themes, choice saved in
+/** @fileoverview P0.7 / A15.10 theme picker (design-pg10.md, user t253): exactly 7 dark themes (apple added, PG10-13), choice saved in
  *  localStorage 'pulse-theme'. Unknown/dropped/empty value or a throwing localStorage -> default, never rewritten.
  *  Picker lives on #/more (phone 4th tab; desktop side-nav footer link). Cosmetic only: never changes tier, data or wording.
  *  shortcut: desktop popover + phone bottom sheet (design §5) are simplified to the #/more listbox for the P0 preview. */
@@ -7,7 +7,8 @@
   const KEY = 'pulse-theme', DEFAULT = 'cp2077-terminal';
   const THEMES = [['cp2077-terminal', 'CP2077 Terminal', ['#020409', '#B0EEEC', '#5EF6FF', '#1BD075', '#F45952']], ['dark-blue', 'Dark Blue', ['#0b1220', '#e2e8f0', '#38bdf8', '#4ade80', '#f87171']],
     ['github-dark', 'GitHub Dark', ['#0d1117', '#c9d1d9', '#58a6ff', '#4ade80', '#f87171']], ['midnight', 'Midnight', ['#070b14', '#e2e8f0', '#5b8def', '#34d399', '#f87171']],
-    ['graphite', 'Graphite', ['#0e0e0e', '#e8e8e8', '#90caf9', '#81c784', '#e57373']], ['amber-terminal', 'Amber Terminal', ['#0c0a04', '#ffd27a', '#ffb000', '#c8ff5a', '#ff5a3a']]];
+    ['graphite', 'Graphite', ['#0e0e0e', '#e8e8e8', '#90caf9', '#81c784', '#e57373']], ['amber-terminal', 'Amber Terminal', ['#0c0a04', '#ffd27a', '#ffb000', '#c8ff5a', '#ff5a3a']],
+    ['apple', 'Apple', ['#000000', '#FFFFFF', '#409CFF', '#30D158', '#FF6961']]];   // PG10-13 (design-pg10.md §8 addendum)
   const IDS = THEMES.map(t => t[0]), nameOf = id => (THEMES.find(t => t[0] === id) || THEMES[0])[1];
   /** Saved theme or the default; never throws, never writes. */
   function read(storage) { try { const v = storage && storage.getItem(KEY); return IDS.includes(v) ? v : DEFAULT; } catch { return DEFAULT; } }

@@ -67,7 +67,11 @@
   const previewText = st => (st.live === true ? PREVIEW_LIVE : st.paidDefault && st.role === 'pro' ? PREVIEW_SAMPLE_PAID : PREVIEW_SAMPLE);
   /** t312u: default tier from the package config (window.PULSE_PACKAGE.defaultTier, Pages = 'pro'); an explicit ?tier= wins; else free. */
   const defaultRole = (tierParam, pkg) => (tierParam === 'pro' || tierParam === 'free' ? tierParam : pkg && pkg.defaultTier === 'pro' ? 'pro' : 'free');
-  const DISC = 'Scores describe the expected size of a news story\u2019s market effect, from \u221210 to +10 on an exponential scale (each step \u2248 \u00d71.41, every 2 steps \u00d72). Calibration pending: the scale is not yet fitted to measured moves. Not investment advice. Past results do not predict future moves. Sample data.';
+  const DISC = 'Scores describe the expected size of a news story\u2019s market effect, from \u221210 to +10 on an exponential scale (each step \u2248 \u00d71.41, every 2 steps \u00d72). Calibration pending: the scale is not yet fitted to measured moves. Not investment advice. Past results do not predict future moves.';
+  // t338: the footer names the source of what THIS view shows (feed vs history vs sample-only views)
+  const srcNote = (view, st) => (['themes', 'theme', 'archive'].includes(view) ? (PH_DATA() && PH_DATA().sample === false ? 'Themes and archive: stored publishes.' : 'Sample data.')
+    : view === 'movers' ? 'Sample movers (no live quotes yet).' : ['feed', 'cluster', 'ticker', 'map', undefined, ''].includes(view) ? (st.live === true ? 'Feed: our latest run.' : 'Sample data.') : 'Sample data.');
+  const PH_DATA = () => (isNode ? require('./pulse-history-data.js') : root.PulseHistoryData);
   const CAL = '<span class="cal">\u25C6 Calibration pending</span>';
   const timeOf = iso => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Oslo' });
   const dateOf = iso => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Europe/Oslo' });
@@ -104,7 +108,7 @@
   function viewFeed(st) {
     const list = sortClusters(st.visible, st.sort);
     const lockedN = st.role === 'free' ? st.all.length - st.visible.length : 0;
-    const head = `<div class="head"><div><h1>&gt; Clusters</h1><div class="sub">${st.role === 'free' ? 'Free \u00b7 previous trading day only' : 'Today \u00b7 live'} \u00b7 sorted by ${st.sort === 'impact' ? '|impact|' : st.sort} \u00b7 ${list.length} shown</div></div><span class="sp"></span>` +
+    const head = `<div class="head"><div><h1>&gt; Clusters</h1><div class="sub">${st.role === 'free' ? 'Free \u00b7 previous trading day only' : st.live === true ? 'Today \u00b7 live' : 'Today \u00b7 sample'} \u00b7 sorted by ${st.sort === 'impact' ? '|impact|' : st.sort} \u00b7 ${list.length} shown</div></div><span class="sp"></span>` +
       `<div class="seg" role="group" aria-label="Sort">${['impact', 'newest', 'coverage'].map(m => `<button type="button" data-sort="${m}" aria-pressed="${st.sort === m}">${m}</button>`).join('')}</div></div>`;
     const body = list.length ? list.map(card).join('\n') : `<div class="empty">No clusters from the previous trading day.</div>`;
     return PM.viewSeg('feed') + head + `<div class="list">${lockedN ? paywall(lockedN) : ''}${body}</div>`;
@@ -156,7 +160,7 @@
       `<span class="tier ${st.role === 'pro' ? 'paid' : 'free'}">${st.role === 'pro' ? proLabel(st) : 'FREE \u00b7 PREVIOUS TRADING DAY'}</span>` +
       (st.role === 'free' ? `<a class="btn sec" href="#/account">Upgrade \u00b7 99 kr/month</a>` : '') + `</header>` +
       `<nav class="side" aria-label="Primary"><div class="grp">// VIEWS</div>${nav.map(([k, n]) => `<a href="${q}#/${k}"${k === cur ? ' aria-current="page"' : ''}>${n}</a>`).join('')}<a class="theme-link" href="${q}#/more">\u25D0 Theme: ${TH.nameOf(st.theme || TH.DEFAULT)}</a></nav>` +
-      `<main id="main" tabindex="-1"><p class="preview-note" role="note">${previewText(st)}</p><p class="calm">${CAL}</p>${main}<p class="disc">${DISC}</p></main>` +
+      `<main id="main" tabindex="-1"><p class="preview-note" role="note">${previewText(st)}</p><p class="calm">${CAL}</p>${main}<p class="disc">${DISC} ${srcNote(view, st)}</p></main>` +
       `<aside class="rail" aria-label="Context">${rail(st)}</aside></div>` +
       `<nav class="tabbar" aria-label="Primary (phone)">${phone.map(([k, , s]) => `<a href="${q}#/${k}"${k === cur ? ' aria-current="page"' : ''}>${s}</a>`).join('')}</nav>`;
   }
