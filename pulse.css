@@ -175,3 +175,14 @@ td.tcol{min-width:120px}
 .links{margin-top:8px}
 .lk{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0}.lk-l{font:12px var(--mono);color:var(--cp-idle)}
 .lk-t{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+/* t344s1271 + t345u: eventline-style cluster cards, article toggle, stance history (theme tokens only, so all 7 themes apply) */
+.group .group-top{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.group .lk .tick{display:flex;flex-wrap:wrap;gap:6px}
+.toggle-arts{margin-top:8px}
+.arts{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;margin-top:8px}
+.art{border:1px solid var(--line);border-radius:6px;padding:8px}.art h4{margin:0 0 4px;font-size:14px}
+.hist{margin-top:10px}.hist h4{display:flex;gap:8px;align-items:center;margin:0 0 4px;font-size:13px}
+.hist-t{border-collapse:collapse;font-size:13px;width:100%;max-width:460px}.hist-t th,.hist-t td{padding:2px 8px;border-bottom:1px solid var(--line);text-align:left}.hist-t th{color:var(--cp-idle);font-weight:normal}.hist-t .r{text-align:right}
+.spark .zero{stroke:currentColor;opacity:.3}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.arts[hidden],.hist-t tbody[hidden]{display:none}

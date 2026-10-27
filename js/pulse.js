@@ -14,6 +14,7 @@
   const AR = isNode ? require('./pulse-archive.js') : root.PulseArchive;     // P0.5 A15.5 archive (SAMPLE)
   const SU = isNode ? require('./summary.js') : root.PulseSummary;           // P0.4 A16.4 Daily summary (SAMPLE)
   const PH = isNode ? require('./pulse-history.js') : root.PulseHistory;      // P0.2 A14.5 theme history (SAMPLE)
+  const CL = isNode ? require('./pulse-clusters.js') : root.PulseClusters;      // t344s1271 eventline cards + t345u stance history
   const Ti = isNode ? require('./tiers.js') : root.PulseTiers;                // A13 tier + "N stories → 1 event" 
   /** A10/A11 context cards for a set of tickers; every card carries its source credit + link. */
   function extrasHtml(tickers) {
@@ -110,7 +111,8 @@
     const lockedN = st.role === 'free' ? st.all.length - st.visible.length : 0;
     const head = `<div class="head"><div><h1>&gt; Clusters</h1><div class="sub">${st.role === 'free' ? 'Free \u00b7 previous trading day only' : st.live === true ? 'Today \u00b7 live' : 'Today \u00b7 sample'} \u00b7 sorted by ${st.sort === 'impact' ? '|impact|' : st.sort} \u00b7 ${list.length} shown</div></div><span class="sp"></span>` +
       `<div class="seg" role="group" aria-label="Sort">${['impact', 'newest', 'coverage'].map(m => `<button type="button" data-sort="${m}" aria-pressed="${st.sort === m}">${m}</button>`).join('')}</div></div>`;
-    const body = list.length ? list.map(card).join('\n') : `<div class="empty">No clusters from the previous trading day.</div>`;
+    const cards = CL.cardsHtml(list, Object.assign({ themes: PH_DATA().themes, markets: root.PULSE_MARKETS, clusterMap: (root.PULSE_PACKAGE || {}).clusterMap }, st));
+    const body = (list.length ? '' : `<div class="empty">No clusters from the previous trading day.</div>`) + cards;
     return PM.viewSeg('feed') + head + `<div class="list">${lockedN ? paywall(lockedN) : ''}${body}</div>`;
   }
   function viewCluster(st, id) {
@@ -151,8 +153,8 @@
       : view === 'more' ? TH.viewMore(st) : view === 'map' ? PMAP.viewMap(st, decodeURIComponent(arg || ''))
       : view === 'movers' ? PM.viewMovers(st, arg, arg2) : view === 'archive' ? AR.viewArchive(st, decodeURIComponent(arg || '')) : view === 'summary' ? SU.viewSummary(st) : view === 'themes' ? PH.viewThemes(st) : view === 'theme' ? PH.viewTheme(st, decodeURIComponent(arg || ''))
       : view === 'ticker' ? viewTicker(st, decodeURIComponent(arg || '')) : view === 'watchlist' ? viewWatch(st) : view === 'account' ? viewAccount(st) : viewFeed(st);
-    const cur = view === 'track' ? 'track' : view === 'themes' || view === 'theme' ? 'themes' : view === 'summary' ? 'summary' : view === 'archive' ? 'archive' : view === 'movers' ? 'movers' : view === 'more' || view === 'map' || view === 'account' ? 'more' : view === 'watchlist' ? 'watchlist' : view === 'account' ? 'account' : 'feed';
-    const nav = [['feed', 'Clusters', 'Clusters'], ['movers', 'Movers', 'Movers'], ['summary', 'Daily summary', 'Brief'], ['themes', 'Themes', 'Themes'], ['archive', 'Archive', 'Archive'], ['track', 'Track record', 'Track'], ['watchlist', 'Watchlist', 'Watch'], ['more', 'More', 'More']];
+    const cur = view === 'track' ? 'track' : view === 'themes' || view === 'theme' ? 'themes' : view === 'summary' ? 'summary' : view === 'archive' ? 'archive' : view === 'movers' ? 'movers' : view === 'map' ? 'map' : view === 'more' || view === 'account' ? 'more' : view === 'watchlist' ? 'watchlist' : view === 'account' ? 'account' : 'feed';
+    const nav = [['feed', 'Clusters', 'Clusters'], ['movers', 'Movers', 'Movers'], ['summary', 'Daily summary', 'Brief'], ['map', 'World map', 'Map'], ['archive', 'Days', 'Days'], ['track', 'Track record', 'Track'], ['watchlist', 'Watchlist', 'Watch'], ['more', 'More', 'More']];
     const phone = nav.filter(([k]) => ['feed', 'track', 'watchlist', 'more'].includes(k));   // design-pg10 §5: 4 phone tabs
     const q = st.role === 'pro' ? '?tier=pro' : '?tier=free';
     return `<a class="skip" href="#main">Skip to content</a><div class="frame">` +
@@ -175,10 +177,11 @@
     const qs = new URLSearchParams(location.search), D = root.PulseData;
     const role = defaultRole(qs.get('tier'), root.PULSE_PACKAGE), paidDefault = !!(root.PULSE_PACKAGE && root.PULSE_PACKAGE.defaultTier === 'pro');
     const now = new Date(qs.get('now') || D.demoNow);
-    const st = { role, now, live: D.live === true, paidDefault, all: D.clusters, visible: forRole(D.clusters, role, now), track: D.track, movers: D.movers, sort: 'impact', filter: 'all',
+    const st = { role, now, live: D.live === true, paidDefault, all: D.clusters, visible: forRole(D.clusters, role, now), track: D.track, movers: D.movers, history: D.remoteHistory || [], sort: 'impact', filter: 'all',
       watch: ['EQNR.OL', 'NVDA', 'TSLA', 'DNB.OL'].filter(s => !root.PULSE_MARKETS || root.PULSE_MARKETS.includes(root.PulseSource.marketOf(s))), hash: location.hash, theme: TH.read(root.localStorage) };
     const app = document.getElementById('app');
     const draw = () => { st.hash = location.hash || '#/feed'; app.innerHTML = render(st); if (/^#\/map(\/|$)/.test(st.hash)) PMAP.mount(document, st); };   // P0.8: map loads only on its view
+    CL.wire(app);
     TH.wire(document, root.localStorage, () => { st.theme = TH.read(root.localStorage); draw(); });
     app.addEventListener('click', e => {
       const b = e.target.closest('button[data-sort],button[data-filter]'); if (!b) return;
