@@ -1,0 +1,17 @@
+{
+  "note": "SAMPLE fixture for A8 tests (not real quotes). as_of in UTC.",
+  "movers": [
+    { "symbol": "NVDA", "market": "US", "side": "loser", "changePercent": -3.1, "as_of": "2026-10-27T15:00:00Z" },
+    { "symbol": "EQNR.OL", "market": "NO", "side": "", "changePercent": 2.4, "as_of": "2026-10-27T10:00:00Z" },
+    { "symbol": "AAPL", "market": "US", "side": "winner", "changePercent": 1.2, "as_of": "2026-10-27T15:00:00Z" },
+    { "symbol": "MOWI.OL", "market": "NO", "side": "winner", "changePercent": -0.4, "as_of": "2026-10-27T06:00:00Z" },
+    { "symbol": "TSLA", "market": "US", "side": "", "changePercent": -1.5, "as_of": "2026-10-27T15:00:00Z" }
+  ],
+  "clusters": [
+    { "id": "c-chip-rules", "title": "US widens chip export rules to more data-center GPUs", "published_at": "2026-10-27T11:52:00Z", "s": -8, "tickers": [{ "ticker": "NVDA" }] },
+    { "id": "c-old-nvda", "title": "Older NVDA story from last week", "published_at": "2026-10-20T11:00:00Z", "s": 5, "tickers": [{ "ticker": "NVDA" }] },
+    { "id": "c-eqnr-capex", "title": "Equinor lifts 2026 capex guidance after Johan Castberg ramp-up", "published_at": "2026-10-27T07:14:00Z", "s": 7, "tickers": [{ "ticker": "EQNR.OL" }] },
+    { "id": "c-mowi-q3", "title": "Mowi Q3 harvest volume above company guidance", "published_at": "2026-10-27T06:30:00Z", "s": 5, "tickers": [{ "ticker": "MOWI.OL" }] },
+    { "id": "c-tsla-late", "title": "Tesla story AFTER the mover's as_of", "published_at": "2026-10-27T15:30:00Z", "s": -4, "tickers": [{ "ticker": "TSLA" }] }
+  ]
+}
