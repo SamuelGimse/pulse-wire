@@ -11,7 +11,8 @@
   const DESC = 'Descriptive only: equal-weight basket move of the theme\u2019s fixed stocks between publishes (not benchmark-adjusted, not a performance claim, not investment advice).';
   const emptyText = d => `History starts ${esc(d.launch_date)}.`;   // A14-10 day-1 empty state
 
-  /** Split a theme's rows for the role: free sees only the previous trading day's publishes; the rest is counted, never sent. */
+  /** Split a theme's rows for the role: free sees only the previous trading day's publishes; the rest is counted and hidden.
+   *  PREVIEW ONLY (N1): the sample data is all in the client, so this is not a paywall; the real one is server-side RLS (paywall.sql). */
   function visible(rows, role, now) {
     if (role === 'pro') return { rows, locked: 0 };
     const ok = rows.filter(r => Cal.inFreeWindow(r.market, r.created_at, now)); return { rows: ok, locked: rows.length - ok.length };

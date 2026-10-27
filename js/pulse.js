@@ -60,6 +60,8 @@
   const pct = v => (v == null ? 'n/a' : (v > 0 ? '+' : v < 0 ? '\u2212' : '') + Math.abs(v).toFixed(2) + '%');
 
   // ---- views ----
+  // N1 (sir-nitpickalot r2): the free/Pro split here is client-side on sample data, so it is NOT a paywall; the real one is backend RLS.
+  const PREVIEW = 'Preview: sample data, paywall not enforced';
   const DISC = 'Scores describe the expected size of a news story\u2019s market effect, from \u221210 to +10 on an exponential scale (each step \u2248 \u00d71.41, every 2 steps \u00d72). Calibration pending: the scale is not yet fitted to measured moves. Not investment advice. Past results do not predict future moves. Sample data.';
   const CAL = '<span class="cal">\u25C6 Calibration pending</span>';
   const timeOf = iso => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Oslo' });
@@ -143,7 +145,7 @@
       `<span class="tier ${st.role === 'pro' ? 'paid' : 'free'}">${st.role === 'pro' ? 'PRO \u00b7 LIVE' : 'FREE \u00b7 PREVIOUS TRADING DAY'}</span>` +
       (st.role === 'free' ? `<a class="btn sec" href="#/account">Upgrade \u00b7 99 kr/month</a>` : '') + `</header>` +
       `<nav class="side" aria-label="Primary"><div class="grp">// VIEWS</div>${nav.map(([k, n]) => `<a href="${q}#/${k}"${k === cur ? ' aria-current="page"' : ''}>${n}</a>`).join('')}<a class="theme-link" href="${q}#/more">\u25D0 Theme: ${TH.nameOf(st.theme || TH.DEFAULT)}</a></nav>` +
-      `<main id="main" tabindex="-1"><p class="calm">${CAL}</p>${main}<p class="disc">${DISC}</p></main>` +
+      `<main id="main" tabindex="-1"><p class="preview-note" role="note">${PREVIEW}</p><p class="calm">${CAL}</p>${main}<p class="disc">${DISC}</p></main>` +
       `<aside class="rail" aria-label="Context">${rail(st)}</aside></div>` +
       `<nav class="tabbar" aria-label="Primary (phone)">${phone.map(([k, , s]) => `<a href="${q}#/${k}"${k === cur ? ' aria-current="page"' : ''}>${s}</a>`).join('')}</nav>`;
   }

@@ -165,3 +165,6 @@ td.tcol{min-width:120px}
 }
 @media (min-width:768px){.viewseg{display:none}}
 @media (prefers-reduced-motion:reduce){.tabs [role=tab],.mrow{transition:none;animation:none}}
+.preview-note{font:12px var(--mono);color:var(--cp-scan);border:1px dashed var(--line);padding:4px 8px;margin:0 0 12px}  /* N1 preview-only paywall note */
+.card>div:only-child{grid-column:1/-1}  /* P0.2-P0.8 cards without an impact badge span the full width */
+.railmv .tk{min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center}.railmv+p a{display:inline-flex;align-items:center;min-height:44px}  /* DA14 44px targets (P0.6 rail module) */
