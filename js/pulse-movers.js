@@ -7,7 +7,7 @@
   const MX = isNode ? require('./movers-explain.js') : root.MoversExplain;
   const Ti = isNode ? require('./tiers.js') : root.PulseTiers;
   const esc = x => String(x == null ? '' : x).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const TABS = [['active', 'Active'], ['winners', 'Winners'], ['losers', 'Losers']], CAP = 10;
+  const TABS = [['mostTraded', 'Most traded'], ['winners', 'Winners'], ['losers', 'Losers']];
   const NOTE = 'Context, not cause: a story shown here was published in our feed during the move\u2019s window. It does not explain why the price moved. Moves are session change vs the previous close. Not investment advice.';
   // P30: round once to the shown 0.1 (half away from zero) so tab, sign and label agree; + 0 turns -0 into 0
   const pctOf = m => { if (m.changePercent == null || m.changePercent === '') return null; const v = Number(m.changePercent); return Math.sign(v) * Math.round(Math.abs(v) * 10) / 10 + 0; };
@@ -21,6 +21,7 @@
   }
   function moveHtml(m) {
     const p = pctOf(m), s = signOf(m), [ar, sg, w] = s === 'up' ? ['\u25B2', '+', 'UP'] : s === 'down' ? ['\u25BC', '\u2212', 'DOWN'] : ['\u25CF', '\u00b1', 'FLAT'];
+    if (p == null) return '<span class="mv-move" aria-label="change unavailable">n/a</span>';
     return `<span class="mv-move" aria-label="${w.toLowerCase()} ${s === 'down' ? 'minus ' : s === 'up' ? 'plus ' : ''}${Math.abs(p).toFixed(1)} percent">${ar} ${sg}${Math.abs(p).toFixed(1)}%<small>${w}</small></span>`;
   }
   const ago = (iso, now) => { const h = Math.max(0, Math.round((+now - Date.parse(iso)) / 36e5)); return h < 1 ? 'less than 1 h ago' : `${h} h ago`; };
@@ -41,21 +42,26 @@
     const list = (lab, xs) => { const id = `lk${++lkN}`; return xs.length ? `<div class="lk"><span class="lk-l" id="${id}">${lab}</span><ul class="lk-t" aria-labelledby="${id}">${xs.map(t => `<li><a class="tk" href="#/ticker/${encodeURIComponent(t)}">${esc(t)}</a></li>`).join('')}</ul></div>` : ''; };
     return `<div class="links" role="group" aria-label="Linked stocks">${list('Mentioned', mentioned)}${list('Default', def)}<p class="sub">Context, not advice.</p></div>`;
   }
-  const row = (m, st) => `<li class="mrow ${({ up: 'up', down: 'dn', flat: 'fl' })[signOf(m)]}"><a class="tk" href="#/ticker/${encodeURIComponent(m.symbol)}">${esc(m.symbol)}</a>${moveHtml(m)}${storyHtml(m, st)}</li>`;
-  const EMPTY = { active: 'No moves yet for this session. Quotes update after the market opens.', winners: 'No tickers are up this session.', losers: 'No tickers are down this session.' };
+  const row = (m, st, tab) => `<li class="mrow ${({ up: 'up', down: 'dn', flat: 'fl' })[signOf(m)] || 'fl'}"><a class="tk" href="#/ticker/${encodeURIComponent(m.symbol)}">${esc(m.symbol)}</a>${moveHtml(m)}${tab === 'mostTraded' && m.volume != null ? `<span class="sub">Vol ${Number(m.volume).toLocaleString('en-US')}</span>` : ''}${storyHtml(m, st)}</li>`;
+  const EMPTY = { mostTraded: 'No most-traded quotes are available yet.', winners: 'No tickers are up this session.', losers: 'No tickers are down this session.' };
   const SAMPLE_MOVERS = 'Sample movers (no live quotes yet)';
+  function rowsFor(st, tab) {
+    const source = st.marketMovers && st.marketMovers[tab];
+    if (Array.isArray(source)) return tab === 'mostTraded' ? source : tabRows(source, tab);
+    return tabRows(st.movers, tab === 'mostTraded' ? 'active' : tab);
+  }
+  const sourceLabel = st => st.marketMovers ? `${esc(st.marketMovers.provider)} · as of ${esc(oslo(st.marketMovers.as_of))}` : esc(SAMPLE_MOVERS);
   const viewSeg = cur => `<nav class="viewseg" aria-label="Clusters or movers"><a href="#/feed"${cur === 'feed' ? ' aria-current="page"' : ''}>Clusters</a><a href="#/movers"${cur === 'movers' ? ' aria-current="page"' : ''}>Movers</a></nav>`;
   function viewMovers(st, tabArg, nArg) {
-    const tab = TABS.some(([k]) => k === tabArg) ? tabArg : 'active', n = Math.max(CAP, Number(nArg) || CAP), rows = tabRows(st.movers, tab), noQ = (st.movers || []).filter(m => !signOf(m)).length;
-    const tl = `<div class="tabs" role="tablist" aria-label="Movers">${TABS.map(([k, lab]) => `<button type="button" role="tab" id="tab-${k}" data-href="#/movers/${k}" aria-controls="panel-mv" aria-selected="${k === tab}" tabindex="${k === tab ? 0 : -1}">${lab}<span class="n">${tabRows(st.movers, k).length}</span></button>`).join('')}</div>`;
-    const more = rows.length > n ? `<a class="btn sec more" href="#/movers/${tab}/${n + CAP}">Show 10 more (${rows.length - n} left)</a>` : '';
-    const body = rows.length ? `<ul class="mv">${rows.slice(0, n).map(m => row(m, st)).join('')}</ul>${more}` : `<div class="empty">${EMPTY[tab]}</div>`;
-    return `${viewSeg('movers')}<div class="mv-head"><div><h1>&gt; Movers</h1><div class="sub">Session move vs previous close \u00b7 NO + US \u00b7 sorted by size of move \u00b7 <span class="tag">${esc(SAMPLE_MOVERS)}</span></div></div></div>` +
+    const tab = TABS.some(([k]) => k === tabArg) ? tabArg : 'mostTraded', pageSize = tab === 'mostTraded' ? 40 : 20, n = Math.max(pageSize, Number(nArg) || pageSize), rows = rowsFor(st, tab), noQ = rows.filter(m => !signOf(m)).length;
+    const tl = `<div class="tabs" role="tablist" aria-label="Movers">${TABS.map(([k, lab]) => `<button type="button" role="tab" id="tab-${k}" data-href="#/movers/${k}" aria-controls="panel-mv" aria-selected="${k === tab}" tabindex="${k === tab ? 0 : -1}">${lab}<span class="n">${rowsFor(st, k).length}</span></button>`).join('')}</div>`;
+    const more = rows.length > n ? `<a class="btn sec more" href="#/movers/${tab}/${n + pageSize}">Show more (${rows.length - n} left)</a>` : '';
+    const body = rows.length ? `<ul class="mv">${rows.slice(0, n).map(m => row(m, st, tab)).join('')}</ul>${more}` : `<div class="empty">${EMPTY[tab]}</div>`;
+    return `${viewSeg('movers')}<div class="mv-head"><div><h1>&gt; Movers</h1><div class="sub">${tab === 'mostTraded' ? 'Most traded by share volume' : 'Session move vs previous close'} · ${esc(st.marketMovers && st.marketMovers.market || 'US')} · ${sourceLabel(st)}</div></div></div>` +
       `${tl}<section id="panel-mv" role="tabpanel" aria-labelledby="tab-${tab}">${body}${noQ ? `<p class="note">${noQ} ticker${noQ === 1 ? '' : 's'} without a quote</p>` : ''}</section><p class="ctx-note">${NOTE}</p>`;
   }
-  /** t338: no live quotes exist yet, so movers are always the sample, labelled as such (label, not hide). */
-  /** Right-rail module (replaces A8 "Why is it moving?"): top 3 Active rows. */
-  const railHtml = st => `<h2>// Movers</h2><p class="sub">${esc(SAMPLE_MOVERS)}</p><ul class="railmv">${tabRows(st.movers, 'active').slice(0, 3).map(m => `<li><a class="tk" href="#/ticker/${encodeURIComponent(m.symbol)}">${esc(m.symbol)}</a>${moveHtml(m)}</li>`).join('')}</ul><p class="sub"><a href="#/movers">All movers \u2192</a> \u00b7 Context, not cause.</p>`;
+  /** Right-rail module (replaces A8 "Why is it moving?"): top 3 traded rows. */
+  const railHtml = st => `<h2>// Movers</h2><p class="sub">${sourceLabel(st)}</p><ul class="railmv">${rowsFor(st, 'mostTraded').slice(0, 3).map(m => `<li><a class="tk" href="#/ticker/${encodeURIComponent(m.symbol)}">${esc(m.symbol)}</a>${moveHtml(m)}</li>`).join('')}</ul><p class="sub"><a href="#/movers">All movers \u2192</a> · Context, not cause.</p>`;
   /** Browser: real tabs (click, \u2190/\u2192, Home/End; automatic activation; selected tab kept in the route). */
   function wire(doc) {
     const go = b => { if (!b) return; root.location.hash = b.dataset.href; setTimeout(() => { const s = doc.querySelector('[role=tab][aria-selected=true]'); if (s) s.focus(); }, 0); };

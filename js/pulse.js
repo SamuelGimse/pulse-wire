@@ -71,7 +71,7 @@
   const DISC = 'Scores describe the expected size of a news story\u2019s market effect, from \u221210 to +10 on an exponential scale (each step \u2248 \u00d71.41, every 2 steps \u00d72). Calibration pending: the scale is not yet fitted to measured moves. Not investment advice. Past results do not predict future moves.';
   // t338: the footer names the source of what THIS view shows (feed vs history vs sample-only views)
   const srcNote = (view, st) => (['themes', 'theme', 'archive'].includes(view) ? (PH_DATA() && PH_DATA().sample === false ? 'Themes and archive: stored publishes.' : 'Sample data.')
-    : view === 'movers' ? 'Sample movers (no live quotes yet).' : ['feed', 'cluster', 'ticker', 'map', undefined, ''].includes(view) ? (st.live === true ? 'Feed: stored daily reports.' : 'Sample data.') : 'Sample data.');
+    : view === 'movers' ? (st.marketMovers ? `Movers: stored ${st.marketMovers.provider} snapshot.` : 'Sample movers (no live quotes yet).') : ['feed', 'cluster', 'ticker', 'map', undefined, ''].includes(view) ? (st.live === true ? 'Feed: stored daily reports.' : 'Sample data.') : 'Sample data.');
   const PH_DATA = () => (isNode ? require('./pulse-history-data.js') : root.PulseHistoryData);
   const CAL = '<span class="cal">\u25C6 Calibration pending</span>';
   const timeOf = iso => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Oslo' });
@@ -80,7 +80,7 @@
   // t305u + cz19: mentioned = scored tickers, then unscored mentioned stocks; a card with neither says so (no empty labelled group).
   function tickHtml(c) {
     const have = new Set(c.tickers.map(t => t.ticker)), extra = ((c.links || {}).mentioned || []).filter(t => !have.has(t));
-    const chips = c.tickers.map(t => I.chipHtml(t.ticker, t.s)).concat(extra.map(t => I.chipHtml(t, null))).join('');
+    const chips = c.tickers.map(t => { const move = Calc.pctChange(Calc.publishPrice(t), t.live), tone = move > 0 ? 'dpos' : move < 0 ? 'dneg' : 'dneu'; return `<span class="tick-quote">${I.chipHtml(t.ticker, t.s)}<small class="${tone}">${pct(move)} since publish</small></span>`; }).concat(extra.map(t => I.chipHtml(t, null))).join('');
     return chips ? `<div class="tick" aria-label="Mentioned stocks">${chips}</div>` : '<div class="tick"><span class="sub">No mentioned stock</span></div>';
   }
   function card(c) {
@@ -185,7 +185,7 @@
     const qs = new URLSearchParams(location.search), D = root.PulseData;
     const role = defaultRole(qs.get('tier'), root.PULSE_PACKAGE), paidDefault = !!(root.PULSE_PACKAGE && root.PULSE_PACKAGE.defaultTier === 'pro');
     const now = new Date(qs.get('now') || D.demoNow);
-    const st = { role, now, live: D.live === true, paidDefault, all: D.clusters, visible: forRole(D.clusters, role, now), track: D.track, movers: D.movers, history: D.remoteHistory || [], sort: 'impact', filter: 'all',
+    const st = { role, now, live: D.live === true, paidDefault, all: D.clusters, visible: forRole(D.clusters, role, now), track: D.track, movers: D.movers, marketMovers: D.marketMovers || null, history: D.remoteHistory || [], sort: 'impact', filter: 'all',
       watch: ['EQNR.OL', 'NVDA', 'TSLA', 'DNB.OL'].filter(s => !root.PULSE_MARKETS || root.PULSE_MARKETS.includes(root.PulseSource.marketOf(s))), hash: location.hash, theme: TH.read(root.localStorage) };
     const app = document.getElementById('app');
     const draw = () => { st.hash = location.hash || '#/feed'; app.innerHTML = render(st); if (/^#\/map(\/|$)/.test(st.hash)) PMAP.mount(document, st); };   // P0.8: map loads only on its view
