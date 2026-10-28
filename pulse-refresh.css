@@ -221,6 +221,13 @@ h2 { margin: 28px 0 12px; color: var(--cp-idle); font: 700 11px var(--mono); let
 .article-rating.is-positive { color: var(--cp-green); background: rgba(121, 214, 166, .08); }
 .article-rating.is-negative { color: var(--cp-red); background: rgba(241, 141, 135, .08); }
 .article-rating.is-neutral { color: #aab6c0; background: rgba(170, 182, 192, .06); }
+.auth-panel { max-width: 560px; }
+.auth-panel form { display: grid; gap: 14px; margin: 18px 0 12px; }
+.auth-panel label { display: grid; gap: 6px; color: var(--cp-idle); font: 12px var(--mono); }
+.auth-panel input { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: #090d13; color: var(--cp-text); font: 14px var(--ui); }
+.auth-panel input:focus { outline: 2px solid var(--cp-neon); outline-offset: 2px; }
+.auth-actions, .btnrow { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.auth-message { margin: 10px 0; color: var(--cp-neon); font: 12px/1.5 var(--mono); }
 .art .read { display: inline-flex; align-items: center; min-height: 34px; margin-top: 7px; font: 600 12px var(--ui); text-decoration: none; }
 .hist {
   margin-top: 14px;

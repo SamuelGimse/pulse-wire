@@ -9,8 +9,8 @@
   const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_I6HgMNkoKiMcAghe0oyMxA_YNKfurSq';
   const TIMEOUT_MS = 5000;
   // own pipeline rows only, newest first; the columns the legacy frontend reads (api.js fetchPublishes), groups_json holds our own words
-  const QUERY = 'publishes?select=id,title,market,created_at,groups_json&notes=like.PULSE%20pipeline*&order=id.desc&limit=';
-  const LATEST_QUERY = 'publishes?select=id,title,market,created_at,groups_json,notes&notes=like.PULSE%20pipeline*&order=id.desc&limit=1';
+  const QUERY = 'pulse_publishes?select=id,title,market,created_at,groups_json&notes=like.PULSE%20pipeline*&order=id.desc&limit=';
+  const LATEST_QUERY = 'pulse_publishes?select=id,title,market,created_at,groups_json,notes&notes=like.PULSE%20pipeline*&order=id.desc&limit=1';
   // should 40: the notes prefix alone can be spoofed by anyone who can insert, so only ids WE inserted are read: an allowlist generated
   // into the package config (window.PULSE_PACKAGE.ids, from supabase-write/insert-result.json). Prefix check kept too.
   // Future option (needs a schema change + user yes): an owner column with RLS, or a separate own table/view.
@@ -60,10 +60,11 @@
     for (const c of toClusters(r)) { const key = CL.keyOf(c, map), o = by.get(key); if (!o || Math.abs(c.s) > Math.abs(o.impact_score)) by.set(key, { publish_id: 'own:' + r.id, created_at: r.created_at, key, stance: c.stance, impact_score: c.s }); }
     return [...by.values()]; });
   /** GET all allowlisted own rows; resolves { clusters (newest row), history, updated_at } or rejects (HTTP error, timeout, bad JSON, no rows). */
-  async function fetchLive(fetchImpl = root.fetch && root.fetch.bind(root), ids = allowIds()) {
+  async function fetchLive(fetchImpl = root.fetch && root.fetch.bind(root), ids = allowIds(), token) {
     const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, timer = ctl && setTimeout(() => ctl.abort(), TIMEOUT_MS);
     try {
-      const headers = { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: 'Bearer ' + SUPABASE_PUBLISHABLE_KEY, Accept: 'application/json' }, requests = [];
+      if (!token) throw new Error('sign in to load live feed');
+      const headers = { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: 'Bearer ' + token, Accept: 'application/json' }, requests = [];
       if (ids.length) requests.push(SUPABASE_URL + '/rest/v1/' + QUERY + ids.length + '&id=in.(' + ids.join(',') + ')');
       requests.push(SUPABASE_URL + '/rest/v1/' + LATEST_QUERY);
       const results = await Promise.all(requests.map(async url => {
@@ -90,9 +91,9 @@
     } finally { if (timer) clearTimeout(timer); }
   }
   /** Fill PulseData from Supabase (live) or keep the sample (fallback). Always resolves; true = live. */
-  async function apply(data, fetchImpl) {
+  async function apply(data, fetchImpl, token) {
     try {
-      const r = await fetchLive(fetchImpl), PS = root.PulseSource;
+      const r = await fetchLive(fetchImpl, allowIds(), token), PS = root.PulseSource;
       PS.applyStore(data, { live: true, clusters: r.clusters, updated_at: r.updated_at, charts: {} });
       data.marketMovers = r.marketMovers && (!Array.isArray(root.PULSE_MARKETS) || root.PULSE_MARKETS.includes(r.marketMovers.market)) ? r.marketMovers : null;
       data.movers = data.marketMovers ? [...data.marketMovers.mostTraded, ...data.marketMovers.winners, ...data.marketMovers.losers] : [];
@@ -100,7 +101,7 @@
       return data.live === true;
     } catch (e) { if (root.console) root.console.warn('Live feed unavailable, showing sample data:', e.message); return false; }
   }
-  const api = { toClusters, averageRating, marketMoversOf, historyOf, fetchLive, apply, allowIds, SUPABASE_URL, QUERY };
+  const api = { toClusters, averageRating, marketMoversOf, historyOf, fetchLive, apply, allowIds, SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, QUERY };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.PulseRemote = api;
 })(typeof window !== 'undefined' ? window : globalThis);
