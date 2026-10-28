@@ -10,7 +10,7 @@
   const TIMEOUT_MS = 5000;
   // own pipeline rows only, newest first; the columns the legacy frontend reads (api.js fetchPublishes), groups_json holds our own words
   const QUERY = 'pulse_publishes?select=id,title,market,created_at,groups_json&notes=like.PULSE%20pipeline*&order=id.desc&limit=';
-  const LATEST_QUERY = 'pulse_publishes?select=id,title,market,created_at,groups_json,notes&notes=like.PULSE%20pipeline*&order=id.desc&limit=1';
+  const LATEST_QUERY = 'pulse_publishes?select=id,title,market,created_at,groups_json,notes&notes=like.PULSE%20pipeline*&order=id.desc&limit=500';
   // should 40: the notes prefix alone can be spoofed by anyone who can insert, so only ids WE inserted are read: an allowlist generated
   // into the package config (window.PULSE_PACKAGE.ids, from supabase-write/insert-result.json). Prefix check kept too.
   // Future option (needs a schema change + user yes): an owner column with RLS, or a separate own table/view.
@@ -84,8 +84,9 @@
       const clusters = toClusters(rows[0], liveQuotes);   // newest row = default feed
       const byDay = new Map();
       for (const row of rows) {
-        const date = dayKey(row.created_at);
-        if (!byDay.has(date)) byDay.set(date, { date, publish_id: row.id, title: str(row.title), market: str(row.market || 'US'), updated_at: row.created_at, clusters: toClusters(row, liveQuotes) });
+        const date = dayKey(row.created_at), report = byDay.get(date), clustersForRow = toClusters(row, liveQuotes);
+        if (!report) byDay.set(date, { date, publish_id: row.id, title: str(row.title), market: str(row.market || 'US'), updated_at: row.created_at, clusters: clustersForRow });
+        else report.clusters.push(...clustersForRow);
       }
       return { clusters, dailyReports: [...byDay.values()], marketMovers, history: historyOf(rows, CL, pkg && pkg.clusterMap), updated_at: rows[0].created_at };
     } finally { if (timer) clearTimeout(timer); }

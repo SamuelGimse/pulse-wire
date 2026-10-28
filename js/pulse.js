@@ -124,6 +124,32 @@
     const body = (list.length ? '' : `<div class="empty">No clusters for this report day.</div>`) + cards;
     return PM.viewSeg('feed') + stanceDefaultsChart(st) + dayNav + head + `<div class="list">${lockedN ? paywall(lockedN) : ''}${body}</div>`;
   }
+  function viewWeekly(st, mode = 'clusters') {
+    const reports = (root.PulseData.dailyReports || []).slice().sort((a,b) => a.date.localeCompare(b.date));
+    const end = reports.length ? reports[reports.length - 1].date : dateOf(st.now), start = new Date(Date.parse(end + 'T12:00:00Z') - 6 * 86400000).toISOString().slice(0,10);
+    const week = reports.filter(r => r.date >= start && r.date <= end), map = (root.PULSE_PACKAGE || {}).clusterMap || {};
+    const tabs = `<div class="seg"><a class="btn ${mode === 'clusters' ? 'primary' : 'sec'}" href="#/weekly/clusters">Weekly clusters</a><a class="btn ${mode === 'trends' ? 'primary' : 'sec'}" href="#/weekly/trends">Weekly trends</a></div>`;
+    const heading = `<div class="head"><div><h1>Weekly ${mode === 'trends' ? 'trends' : 'clusters'}</h1><div class="sub">${esc(start)} – ${esc(end)} · ${week.length} publish days</div></div></div>`;
+    if (st.role !== 'pro') return tabs + heading + `<section class="wall"><h3>Weekly history is a Pro view</h3><p>Free accounts see the previous trading day. Pro includes weekly clusters, score trends, and full history.</p><a class="btn primary" href="#/account">View plans</a></section>`;
+    const groups = new Map(), daily = new Map(week.map(r => [r.date,{date:r.date,scores:[],count:0}]));
+    for (const r of week) for (const c of r.clusters || []) {
+      const d=daily.get(r.date); d.count++; if(c.s) d.scores.push(c.s);
+      const key=CL.keyOf(c,map); let g=groups.get(key);
+      if(!g){g={title:c.title,summary:c.summary,market:c.market,latest:c,scores:[],days:new Set(),tickers:new Set(),articles:new Set(),daily:new Map()};groups.set(key,g);}
+      if(c.s){g.scores.push(c.s);g.days.add(r.date);if(!g.daily.has(r.date))g.daily.set(r.date,[]);g.daily.get(r.date).push(c.s);}
+      if(Date.parse(c.published_at)>=Date.parse(g.latest.published_at)){g.latest=c;g.title=c.title;g.summary=c.summary;}
+      for(const t of c.tickers||[])g.tickers.add(t.ticker);for(const a of c.articles||[])g.articles.add(a.link||a.title);
+    }
+    const ranked=[...groups.values()].map(g=>({...g,score:g.scores.length?Math.round(g.scores.reduce((a,b)=>a+b,0)/g.scores.length):0})).sort((a,b)=>Math.abs(b.score)-Math.abs(a.score)||b.days.size-a.days.size);
+    if(mode==='trends'){
+      const pts=[...daily.values()],W=740,H=230,L=42,R=20,T=20,B=34,x=i=>pts.length<2?W/2:L+i*(W-L-R)/(pts.length-1),y=v=>T+(10-v)*(H-T-B)/20,avg=d=>d.scores.length?d.scores.reduce((a,b)=>a+b,0)/d.scores.length:0;
+      const line=pts.map((d,i)=>`${i?'L':'M'}${x(i)},${y(avg(d))}`).join(' '), max=Math.max(1,...pts.map(d=>d.count));
+      const graph=`<section class="stance-defaults"><h2>// Daily score and activity</h2><div class="sd-legend"><span>Mean nonzero score · −10 to +10</span><span>Bars · cluster releases</span></div><figure><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly cluster score and release count">${[-10,-5,0,5,10].map(v=>`<line class="sd-grid" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text class="sd-axis" x="2" y="${y(v)+4}">${v}</text>`).join('')}${pts.map((d,i)=>`<rect x="${x(i)-7}" y="${H-B-d.count/max*45}" width="14" height="${d.count/max*45}" fill="var(--cp-blue,#78a8ff)" opacity=".35"/>`).join('')}<path d="${line}" fill="none" stroke="var(--cp-green)" stroke-width="2"/>${pts.map((d,i)=>`<circle cx="${x(i)}" cy="${y(avg(d))}" r="3" fill="var(--cp-green)"><title>${esc(d.date)} · ${d.count} releases · score ${avg(d).toFixed(1)}</title></circle><text class="sd-axis" text-anchor="middle" x="${x(i)}" y="${H-8}">${esc(d.date.slice(5))}</text>`).join('')}</svg></figure></section>`;
+      const movers=ranked.filter(g=>g.daily.size>1).map(g=>{const ds=[...g.daily.entries()].sort((a,b)=>a[0].localeCompare(b[0])),f=ds[0][1],l=ds[ds.length-1][1],mean=a=>a.reduce((x,v)=>x+v,0)/a.length;return {g,delta:mean(l)-mean(f)};}).sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta)).slice(0,8);
+      return tabs+heading+graph+`<h2>// Biggest score changes</h2><div class="list">${movers.map(({g,delta})=>`<article class="card ${I.tone(g.score)}">${I.badgeHtml(g.score)}<div><h3><a href="#/cluster/${esc(g.latest.id)}">${esc(g.title)}</a></h3><p>${delta>0?'Strengthened':'Weakened'} ${delta>0?'+':''}${delta.toFixed(1)} points · ${g.days.size} days</p></div></article>`).join('')||'<div class="empty">Not enough repeated cluster history to compare.</div>'}</div>`;
+    }
+    return tabs+heading+`<p class="sub">Grouped by saved cluster identity. Scores average nonzero ratings.</p><div class="list">${ranked.map(g=>`<article class="card ${I.tone(g.score)}">${I.badgeHtml(g.score)}<div><h3><a href="#/cluster/${esc(g.latest.id)}">${esc(g.title)}</a></h3><p>${esc(g.summary)}</p><div class="meta"><span>${g.articles.size} unique articles · ${g.days.size} days · ${g.market}</span></div><div class="tick">${[...g.tickers].slice(0,10).map(t=>I.chipHtml(t,g.score)).join('')}</div></div></article>`).join('')||'<div class="empty">No clusters in this week.</div>'}</div>`;
+  }
   function viewCluster(st, id) {
     const c = st.visible.find(x => x.id === id);
     if (!c) return `<a class="back" href="#/feed">\u2190 Clusters</a><h1>&gt; Not available</h1><p class="note">This cluster is not in your tier\u2019s data (free: the previous trading day only).</p>${st.role === 'free' ? paywall(1) : ''}`;
@@ -198,6 +224,28 @@
       (st.role === 'pro' ? `<section class="wall"><h3>Pro subscription active</h3><p>Full live feed and archive access. ${st.plan && st.plan.current_period_end ? `Current period ends ${esc(new Date(st.plan.current_period_end).toLocaleDateString())}.` : ''}</p><div class="btnrow"><button class="btn sec" type="button" data-auth-action="portal">Manage subscription</button><button class="btn sec" type="button" data-auth-action="logout">Sign out</button></div></section>` :
         `<section class="wall"><h3>Free plan</h3><p>Access the previous trading day’s live feed for free. Pro unlocks live clusters as they are scored and the full publish history.</p><p>Pro · 99 kr/month</p><div class="btnrow"><button class="btn primary" type="button" data-auth-action="checkout">Continue to secure checkout</button>${st.plan && st.plan.stripe_customer_id ? '<button class="btn sec" type="button" data-auth-action="portal">Manage billing</button>' : ''}<button class="btn sec" type="button" data-auth-action="logout">Sign out</button></div></section>`);
   }
+
+
+  function render(st) {
+    const [, view, arg, arg2] = (st.hash || '#/feed').split('/');
+    const main = view === 'cluster' ? viewCluster(st, decodeURIComponent(arg || '')) : view === 'weekly' ? viewWeekly(st, arg || 'clusters') : view === 'track' ? viewTrack(st)
+      : view === 'more' ? TH.viewMore(st) : view === 'map' ? PMAP.viewMap(st, decodeURIComponent(arg || ''))
+      : view === 'movers' ? PM.viewMovers(st, arg, arg2) : view === 'archive' ? AR.viewArchive(st, decodeURIComponent(arg || '')) : view === 'summary' ? SU.viewSummary(st) : view === 'themes' ? PH.viewThemes(st) : view === 'theme' ? PH.viewTheme(st, decodeURIComponent(arg || ''))
+      : view === 'ticker' ? viewTicker(st, decodeURIComponent(arg || '')) : view === 'watchlist' ? viewWatch(st) : view === 'account' ? viewAccount(st) : viewFeed(st, view === 'feed' ? decodeURIComponent(arg || '') : '');
+    const cur = view === 'weekly' ? 'weekly' : view === 'track' ? 'track' : view === 'themes' || view === 'theme' ? 'themes' : view === 'summary' ? 'summary' : view === 'archive' ? 'archive' : view === 'movers' ? 'movers' : view === 'map' ? 'map' : view === 'more' || view === 'account' ? 'more' : view === 'watchlist' ? 'watchlist' : 'feed';
+    const nav = [['feed', 'Clusters', 'Clusters'], ['weekly', 'Weekly', 'Week'], ['movers', 'Movers', 'Movers'], ['summary', 'Daily summary', 'Brief'], ['map', 'World map', 'Map'], ['archive', 'Days', 'Days'], ['track', 'Track record', 'Track'], ['watchlist', 'Watchlist', 'Watch'], ['more', 'More', 'More']];
+    const phone = nav.filter(([k]) => ['feed', 'weekly', 'track', 'watchlist', 'more'].includes(k));
+    const q = '';
+    return `<a class="skip" href="#main">Skip to content</a><div class="frame">` +
+      `<header class="top"><span class="brand">PULSE<b>//</b>WIRE</span><span class="ctx">news impact \u00b7 ${esc((root.PULSE_MARKETS || ['NO', 'US']).join(' + '))}</span><span class="sp"></span>${CAL}` +
+      `<span class="tier ${st.role === 'pro' ? 'paid' : 'free'}">${st.role === 'pro' ? proLabel(st) : 'FREE \u00b7 PREVIOUS TRADING DAY'}</span>` +
+      (st.role === 'free' ? `<a class="btn sec" href="#/account">Upgrade \u00b7 99 kr/month</a>` : '') + `</header>` +
+      `<nav class="side" aria-label="Primary"><div class="grp">// VIEWS</div>${nav.map(([k, n]) => `<a href="${q}#/${k}"${k === cur ? ' aria-current="page"' : ''}>${n}</a>`).join('')}<a class="theme-link" href="${q}#/more">\u25D0 Theme: ${TH.nameOf(st.theme || TH.DEFAULT)}</a></nav>` +
+      `<main id="main" tabindex="-1"><p class="preview-note" role="note">${previewText(st)}</p><p class="calm">${CAL}</p>${main}<p class="disc">${DISC} ${srcNote(view, st)}</p></main>` +
+      `<aside class="rail" aria-label="Context">${rail(st)}</aside></div>` +
+      `<nav class="tabbar" aria-label="Primary (phone)">${phone.map(([k, , s]) => `<a href="${q}#/${k}"${k === cur ? ' aria-current="page"' : ''}>${s}</a>`).join('')}</nav>`;
+  }
+
   function boot() {
     const pkg = root.PULSE_PACKAGE, R = root.PulseRemote, A = root.PulseAuth;
     const ready = A ? A.restore() : Promise.resolve({ session: null, user: null, role: 'free', plan: null });
