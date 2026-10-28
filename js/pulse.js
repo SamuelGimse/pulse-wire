@@ -1,6 +1,5 @@
 /** @fileoverview PULSE//WIRE UI (A6, design-app.md v2). Hash routes: #/feed, #/cluster/<id>, #/track, #/ticker/<t>, #/themes, #/theme/<id>, #/summary, #/archive[/<publish_id>], #/movers[/<tab>[/<n>]], #/more, #/map[/<country>],
- *  #/watchlist, #/account. Tier via ?tier=free|pro (DEMO switch only; the real split is server-side RLS, A4:
- *  the free role never receives today's rows). Offline: sample data, no network. */
+ *  #/watchlist, #/account. Supabase Auth and server-side subscription records determine Free or Pro access. */
 (function (root) {
   const isNode = typeof module !== 'undefined' && module.exports;
   const I = isNode ? require('./impact.js') : root.ClustrImpact;
@@ -63,11 +62,10 @@
   // ---- views ----
   // N1 (sir-nitpickalot r2): the free/Pro split here is client-side on sample data, so it is NOT a paywall; the real one is backend RLS.
   // cz29: the banner says what the page shows: sample data (Pages default package, or no live publish yet) vs live store data.
-  const PREVIEW_SAMPLE = 'Preview: sample data. Paywall not enforced.', PREVIEW_SAMPLE_PAID = 'Preview: sample data. Showing paid tier. Paywall not enforced.', PREVIEW_LIVE = 'Preview: paywall not enforced. Feed from our latest run; sentiment history from stored data.';
+  const PREVIEW_SAMPLE = 'Sample preview. Sign in for the free live feed.', PREVIEW_SAMPLE_PAID = 'Sample preview.', PREVIEW_LIVE = 'Live feed from our latest run.';
   const proLabel = st => (st.live === true ? 'PRO \u00b7 LIVE' : 'PRO \u00b7 SAMPLE');   // cz34: LIVE only with live store data
-  const previewText = st => (st.live === true ? PREVIEW_LIVE : st.paidDefault && st.role === 'pro' ? PREVIEW_SAMPLE_PAID : PREVIEW_SAMPLE);
-  /** t312u: default tier from the package config (window.PULSE_PACKAGE.defaultTier, Pages = 'pro'); an explicit ?tier= wins; else free. */
-  const defaultRole = (tierParam, pkg) => (tierParam === 'pro' || tierParam === 'free' ? tierParam : pkg && pkg.defaultTier === 'pro' ? 'pro' : 'free');
+  const previewText = st => (st.live === true ? PREVIEW_LIVE : PREVIEW_SAMPLE);
+  const defaultRole = auth => (auth && auth.role === 'pro' ? 'pro' : 'free');
   const DISC = 'Scores describe the expected size of a news story\u2019s market effect, from \u221210 to +10 on an exponential scale (each step \u2248 \u00d71.41, every 2 steps \u00d72). Calibration pending: the scale is not yet fitted to measured moves. Not investment advice. Past results do not predict future moves.';
   // t338: the footer names the source of what THIS view shows (feed vs history vs sample-only views)
   const srcNote = (view, st) => (['themes', 'theme', 'archive'].includes(view) ? (PH_DATA() && PH_DATA().sample === false ? 'Themes and archive: stored publishes.' : 'Sample data.')
@@ -144,8 +142,20 @@
       `${extrasHtml([tk])}<div class="list">${list.map(card).join('') || '<div class="empty">No clusters for this ticker in your tier\u2019s data.</div>'}</div>`;
   }
   const viewWatch = st => `<div class="head"><div><h1>&gt; Watchlist</h1><div class="sub">Tickers you follow (local sample)</div></div></div><div class="list rail-list">${st.watch.map(t => I.chipHtml(t, null)).join('')}</div>`;
-  const viewAccount = st => `<div class="head"><div><h1>&gt; Account</h1><div class="sub">Plan: ${st.role === 'pro' ? proLabel(st) : 'FREE \u00b7 PREVIOUS TRADING DAY'}</div></div></div>` +
-    (st.role === 'free' ? `<section class="wall" aria-labelledby="acc-h"><h3 id="acc-h">Pro \u00b7 99 kr/month</h3><p>Live clusters as they are scored. Cancel any time. Payments are not wired in this build.</p><a class="btn primary" href="#/account" aria-disabled="true">Upgrade to Pro \u00b7 99 kr/month</a></section>` : '<p class="sub">You have Pro.</p>');
+  function viewAccount(st) {
+    const message = st.authMessage ? `<p class="auth-message" role="status">${esc(st.authMessage)}</p>` : '';
+    if (!st.user) return `<div class="head"><div><h1>&gt; Account</h1><div class="sub">Sign in or create your free account</div></div></div>` +
+      `<section class="wall auth-panel"><h3>${st.authMode === 'signup' ? 'Create account' : 'Sign in'}</h3>${message}<form data-auth-form>` +
+      `<label>Email<input name="email" type="email" autocomplete="email" required></label><label>Password<input name="password" type="password" minlength="8" autocomplete="${st.authMode === 'signup' ? 'new-password' : 'current-password'}" required></label>` +
+      `<button class="btn primary" type="submit">${st.authMode === 'signup' ? 'Create free account' : 'Sign in'}</button></form>` +
+      `<div class="auth-actions"><button class="btn sec" type="button" data-auth-action="switch">${st.authMode === 'signup' ? 'Already have an account? Sign in' : 'Create a free account'}</button>` +
+      `${st.authMode === 'signin' ? '<button class="btn sec" type="button" data-auth-action="reset">Reset password</button>' : ''}</div></section>`;
+    if (st.recovery) return `<div class="head"><div><h1>&gt; Set a new password</h1><div class="sub">${esc(st.user.email || '')}</div></div></div>${message}` +
+      `<section class="wall auth-panel"><form data-password-reset><label>New password<input name="password" type="password" minlength="8" autocomplete="new-password" required></label><button class="btn primary" type="submit">Update password</button></form></section>`;
+    return `<div class="head"><div><h1>&gt; Account</h1><div class="sub">${esc(st.user.email || '')}</div></div></div>${message}` +
+      (st.role === 'pro' ? `<section class="wall"><h3>Pro subscription active</h3><p>Full live feed and archive access. ${st.plan && st.plan.current_period_end ? `Current period ends ${esc(new Date(st.plan.current_period_end).toLocaleDateString())}.` : ''}</p><div class="btnrow"><button class="btn sec" type="button" data-auth-action="portal">Manage subscription</button><button class="btn sec" type="button" data-auth-action="logout">Sign out</button></div></section>` :
+        `<section class="wall"><h3>Free plan</h3><p>Access the previous trading day’s live feed for free. Pro unlocks live clusters as they are scored and the full publish history.</p><p>Pro · 99 kr/month</p><div class="btnrow"><button class="btn primary" type="button" data-auth-action="checkout">Continue to secure checkout</button>${st.plan && st.plan.stripe_customer_id ? '<button class="btn sec" type="button" data-auth-action="portal">Manage billing</button>' : ''}<button class="btn sec" type="button" data-auth-action="logout">Sign out</button></div></section>`);
+  }
 
   function render(st) {
     const [, view, arg, arg2] = (st.hash || '#/feed').split('/');
@@ -156,7 +166,7 @@
     const cur = view === 'track' ? 'track' : view === 'themes' || view === 'theme' ? 'themes' : view === 'summary' ? 'summary' : view === 'archive' ? 'archive' : view === 'movers' ? 'movers' : view === 'map' ? 'map' : view === 'more' || view === 'account' ? 'more' : view === 'watchlist' ? 'watchlist' : view === 'account' ? 'account' : 'feed';
     const nav = [['feed', 'Clusters', 'Clusters'], ['movers', 'Movers', 'Movers'], ['summary', 'Daily summary', 'Brief'], ['map', 'World map', 'Map'], ['archive', 'Days', 'Days'], ['track', 'Track record', 'Track'], ['watchlist', 'Watchlist', 'Watch'], ['more', 'More', 'More']];
     const phone = nav.filter(([k]) => ['feed', 'track', 'watchlist', 'more'].includes(k));   // design-pg10 §5: 4 phone tabs
-    const q = st.role === 'pro' ? '?tier=pro' : '?tier=free';
+    const q = '';
     return `<a class="skip" href="#main">Skip to content</a><div class="frame">` +
       `<header class="top"><span class="brand">PULSE<b>//</b>WIRE</span><span class="ctx">news impact \u00b7 ${esc((root.PULSE_MARKETS || ['NO', 'US']).join(' + '))}</span><span class="sp"></span>${CAL}` +
       `<span class="tier ${st.role === 'pro' ? 'paid' : 'free'}">${st.role === 'pro' ? proLabel(st) : 'FREE \u00b7 PREVIOUS TRADING DAY'}</span>` +
@@ -170,23 +180,62 @@
   // t318u: the Pages package (PULSE_PACKAGE.remote) loads the live feed from Supabase first; failure/empty -> sample, labelled.
   function boot() {
     const pkg = root.PULSE_PACKAGE, R = root.PulseRemote;
-    if (pkg && pkg.remote && R) return R.apply(root.PulseData).then(start, start);
-    start();
+    const A = root.PulseAuth;
+    const ready = A ? A.restore() : Promise.resolve({ session: null, user: null, role: 'free', plan: null });
+    return ready.then(async auth => {
+      if (pkg && pkg.remote && R && auth.session) await R.apply(root.PulseData, undefined, auth.session.access_token);
+      start(auth);
+    }).catch(() => start({ session: null, user: null, role: 'free', plan: null }));
   }
-  function start() {
+  function start(auth = {}) {
     const qs = new URLSearchParams(location.search), D = root.PulseData;
-    const role = defaultRole(qs.get('tier'), root.PULSE_PACKAGE), paidDefault = !!(root.PULSE_PACKAGE && root.PULSE_PACKAGE.defaultTier === 'pro');
+    const role = defaultRole(auth), paidDefault = false;
     const now = new Date(qs.get('now') || D.demoNow);
-    const st = { role, now, live: D.live === true, paidDefault, all: D.clusters, visible: forRole(D.clusters, role, now), track: D.track, movers: D.movers, history: D.remoteHistory || [], sort: 'impact', filter: 'all',
+    const st = { role, user: auth.user || null, session: auth.session || null, plan: auth.plan || null, recovery: auth.recovery === true, authMode: 'signin', authMessage: new URLSearchParams(location.search).get('checkout') === 'success' ? 'Payment received. Pro access will appear after Stripe confirms your subscription.' : '', now, live: D.live === true, paidDefault, all: D.clusters, visible: forRole(D.clusters, role, now), track: D.track, movers: D.movers, history: D.remoteHistory || [], sort: 'impact', filter: 'all',
       watch: ['EQNR.OL', 'NVDA', 'TSLA', 'DNB.OL'].filter(s => !root.PULSE_MARKETS || root.PULSE_MARKETS.includes(root.PulseSource.marketOf(s))), hash: location.hash, theme: TH.read(root.localStorage) };
     const app = document.getElementById('app');
     const draw = () => { st.hash = location.hash || '#/feed'; app.innerHTML = render(st); if (/^#\/map(\/|$)/.test(st.hash)) PMAP.mount(document, st); };   // P0.8: map loads only on its view
     CL.wire(app);
     TH.wire(document, root.localStorage, () => { st.theme = TH.read(root.localStorage); draw(); });
     app.addEventListener('click', e => {
+      const action = e.target.closest('[data-auth-action]');
+      if (action) {
+        const A = root.PulseAuth;
+        if (action.dataset.authAction === 'switch') { st.authMode = st.authMode === 'signup' ? 'signin' : 'signup'; st.authMessage = ''; draw(); }
+        if (action.dataset.authAction === 'logout') A.signOut().then(() => root.location.reload()).catch(err => { st.authMessage = err.message; draw(); });
+        if (action.dataset.authAction === 'reset') {
+          const email = app.querySelector('[name="email"]')?.value || '';
+          if (!email) { st.authMessage = 'Enter your email first.'; draw(); return; }
+          A.resetPassword(email).then(() => { st.authMessage = 'Password reset email sent. Check your inbox.'; draw(); }).catch(err => { st.authMessage = err.message; draw(); });
+        }
+        if (action.dataset.authAction === 'checkout') A.checkout().catch(err => { st.authMessage = err.message; draw(); });
+        if (action.dataset.authAction === 'portal') A.portal().catch(err => { st.authMessage = err.message; draw(); });
+        return;
+      }
       const b = e.target.closest('button[data-sort],button[data-filter]'); if (!b) return;
       if (b.dataset.sort) st.sort = b.dataset.sort; else st.filter = b.dataset.filter;
       draw(); const again = app.querySelector(`button[data-${b.dataset.sort ? 'sort' : 'filter'}="${b.dataset.sort || b.dataset.filter}"]`); if (again) again.focus();
+    });
+    app.addEventListener('submit', async e => {
+      const passwordForm = e.target.closest('[data-password-reset]');
+      if (passwordForm) {
+        e.preventDefault();
+        const password = String(new FormData(passwordForm).get('password') || '');
+        try { await root.PulseAuth.updatePassword(password); root.location.reload(); }
+        catch (err) { st.authMessage = err.message; draw(); }
+        return;
+      }
+      const form = e.target.closest('[data-auth-form]');
+      if (!form) return;
+      e.preventDefault();
+      const fields = new FormData(form), email = String(fields.get('email') || '').trim(), password = String(fields.get('password') || ''), A = root.PulseAuth;
+      try {
+        if (st.authMode === 'signup') {
+          const result = await A.signUp(email, password);
+          if (result.needsConfirmation) { st.authMessage = 'Check your email to confirm your account, then sign in.'; draw(); return; }
+        } else await A.signIn(email, password);
+        root.location.reload();
+      } catch (err) { st.authMessage = err.message; draw(); }
     });
     window.addEventListener('hashchange', () => { draw(); window.scrollTo(0, 0); });
     draw();
