@@ -197,7 +197,8 @@
     return `<div class="head"><div><h1>&gt; Account</h1><div class="sub">${esc(st.user.email || '')}</div></div></div>${message}` +
       (st.role === 'pro' ? `<section class="wall"><h3>Pro subscription active</h3><p>Full live feed and archive access. ${st.plan && st.plan.current_period_end ? `Current period ends ${esc(new Date(st.plan.current_period_end).toLocaleDateString())}.` : ''}</p><div class="btnrow"><button class="btn sec" type="button" data-auth-action="portal">Manage subscription</button><button class="btn sec" type="button" data-auth-action="logout">Sign out</button></div></section>` :
         `<section class="wall"><h3>Free plan</h3><p>Access the previous trading day’s live feed for free. Pro unlocks live clusters as they are scored and the full publish history.</p><p>Pro · 99 kr/month</p><div class="btnrow"><button class="btn primary" type="button" data-auth-action="checkout">Continue to secure checkout</button>${st.plan && st.plan.stripe_customer_id ? '<button class="btn sec" type="button" data-auth-action="portal">Manage billing</button>' : ''}<button class="btn sec" type="button" data-auth-action="logout">Sign out</button></div></section>`);
-  }  function boot() {
+  }
+  function boot() {
     const pkg = root.PULSE_PACKAGE, R = root.PulseRemote, A = root.PulseAuth;
     const ready = A ? A.restore() : Promise.resolve({ session: null, user: null, role: 'free', plan: null });
     return ready.then(async auth => { if (pkg && pkg.remote && R && auth.session) await R.apply(root.PulseData, undefined, auth.session.access_token); start(auth); }).catch(() => start({ session: null, user: null, role: 'free', plan: null }));
