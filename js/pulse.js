@@ -122,7 +122,7 @@
       `<div class="seg" role="group" aria-label="Sort">${['impact', 'newest', 'coverage'].map(m => `<button type="button" data-sort="${m}" aria-pressed="${st.sort === m}">${m}</button>`).join('')}</div></div>`;
     const cards = CL.cardsHtml(list, Object.assign({ themes: PH_DATA().themes, markets: root.PULSE_MARKETS, clusterMap: (root.PULSE_PACKAGE || {}).clusterMap }, st));
     const body = (list.length ? '' : `<div class="empty">No clusters for this report day.</div>`) + cards;
-    return PM.viewSeg('feed') + dayNav + head + `<div class="list">${lockedN ? paywall(lockedN) : ''}${body}</div>`;
+    return PM.viewSeg('feed') + stanceDefaultsChart(st) + dayNav + head + `<div class="list">${lockedN ? paywall(lockedN) : ''}${body}</div>`;
   }
   function viewCluster(st, id) {
     const c = st.visible.find(x => x.id === id);
