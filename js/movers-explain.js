@@ -12,15 +12,22 @@
   function explain(movers, clusters) {
     return (movers || []).map(m => {
       const asOf = new Date(m.as_of), from = Cal.quoteSessionStart(m.market || 'US', asOf), sym = norm(m.symbol);
-      const hits = (clusters || []).filter(c => {
-        const t = new Date(c.published_at);
-        return t >= from && t <= asOf && (c.tickers || []).some(x => norm(x.ticker || x.symbol || x) === sym);   // no lookahead: t <= as_of
-      }).sort((a, b) => Math.abs(b.s || 0) - Math.abs(a.s || 0) || new Date(b.published_at) - new Date(a.published_at));
+      const hits = (clusters || []).flatMap(c => {
+        if (!(c.tickers || []).some(x => norm(x.ticker || x.symbol || x) === sym)) return [];
+        const inWindow = (c.articles || []).map(article => ({ article, time: Date.parse(article.date) }))
+          .filter(x => Number.isFinite(x.time) && x.time >= +from && x.time <= +asOf); // compare story publication time, not later pipeline insert time
+        if (inWindow.length) return inWindow.map(x => ({ cluster: c, article: x.article, time: x.time }));
+        if (!(c.articles || []).some(article => Number.isFinite(Date.parse(article.date)))) {
+          const time = Date.parse(c.published_at);
+          if (Number.isFinite(time) && time >= +from && time <= +asOf) return [{ cluster: c, article: null, time }];
+        }
+        return [];
+      }).sort((a, b) => Math.abs(b.cluster.s || 0) - Math.abs(a.cluster.s || 0) || b.time - a.time);
       const side = Calc.moverSide(m);   // CF8: side wins; sign only when side is empty
-      const c = hits[0];
+      const hit = hits[0], c = hit && hit.cluster;
       return { symbol: sym, market: m.market, side, direction: side === 'winner' ? 'up' : side === 'loser' ? 'down' : 'flat',
         changePercent: m.changePercent, window: [from.toISOString(), asOf.toISOString()],
-        story: c ? { id: c.id, title: c.title, href: '#/cluster/' + encodeURIComponent(c.id), source_link: c.link || null, published_at: c.published_at } : null,
+        story: c ? { id: c.id, title: c.title, href: '#/cluster/' + encodeURIComponent(c.id), article_title: hit.article && hit.article.title, source_link: hit.article && hit.article.link || c.link || null, published_at: hit.article && hit.article.date || c.published_at } : null,
         text: c ? c.title : NO_STORY };
     });
   }

@@ -26,12 +26,14 @@
   }
   const ago = (iso, now) => { const h = Math.max(0, Math.round((+now - Date.parse(iso)) / 36e5)); return h < 1 ? 'less than 1 h ago' : `${h} h ago`; };
   const oslo = iso => new Date(iso).toLocaleString('en-GB', { timeZone: 'Europe/Oslo' }) + ' Oslo';
+  const clustersFor = st => [...new Map([...(st.dailyReports || []).flatMap(report => report.clusters || []), ...(st.all || [])].map(c => [c.id, c])).values()];
   function storyHtml(m, st) {
-    const [e] = MX.explain([m], st.all || []), c = e.story && (st.all || []).find(x => x.id === e.story.id);
+    const all = clustersFor(st), [e] = MX.explain([m], all), c = e.story && all.find(x => x.id === e.story.id);
     if (!c) return `<span class="nostory">No story in our feed for this window</span>`;
-    if (!(st.visible || []).some(x => x.id === c.id)) return `<a class="lockrow" href="#/account">\u25A3 Story in today\u2019s feed \u00b7 Pro</a>`;   // shortcut: any non-visible story uses this wording
+    if (st.role === 'free' && !(st.visible || []).some(x => x.id === c.id)) return `<a class="lockrow" href="#/account">\u25A3 Story in today\u2019s feed \u00b7 Pro</a>`;
     const t = Ti.tier(c.s), tl = t === Ti.NONE ? 'UNSCORED' : t.toUpperCase();
-    return `<div class="wiim"><a href="#/cluster/${esc(c.id)}">${esc(c.title)}</a><div class="meta sub"><span class="tb">\u25AE ${tl}</span> ${esc(c.sector || '')} \u00b7 in our feed <time datetime="${esc(c.published_at)}" title="${esc(oslo(c.published_at))}">${ago(c.published_at, st.now)}</time></div>${linksHtml(c)}</div>`;
+    const storyLink = e.story.source_link && /^https?:\/\//i.test(e.story.source_link) ? `<a class="story-source" href="${esc(e.story.source_link)}" target="_blank" rel="noopener noreferrer">${esc(e.story.article_title || c.title)}</a>` : `<a href="#/cluster/${esc(c.id)}">${esc(e.story.article_title || c.title)}</a>`;
+    return `<div class="wiim">${storyLink}${e.story.article_title ? `<div class="sub">Cluster: <a href="#/cluster/${esc(c.id)}">${esc(c.title)}</a></div>` : ''}<div class="meta sub"><span class="tb">\u25AE ${tl}</span> ${esc(c.sector || '')} \u00b7 in our feed <time datetime="${esc(e.story.published_at || c.published_at)}" title="${esc(oslo(e.story.published_at || c.published_at))}">${ago(e.story.published_at || c.published_at, st.now)}</time></div>${linksHtml(c)}</div>`;
   }
   // t305u linked stocks: Mentioned (our ticker DB matches) + Default (theme basket). Tickers only; DA9: no advice words.
   // skipMentioned: the feed card already shows mentioned stocks as chips (pulse.js tickHtml).
