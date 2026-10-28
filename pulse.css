@@ -50,6 +50,7 @@ h2{font:700 13px var(--mono);letter-spacing:.18em;color:var(--cp-cyan);text-tran
 .meta{font:12px var(--mono);color:var(--cp-idle);letter-spacing:.04em;margin-top:8px;display:flex;gap:12px;flex-wrap:wrap}
 .tick{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:240px}
 .tick-quote{display:inline-flex;flex-direction:column;align-items:flex-start;gap:3px}.tick-quote small{font:600 10px var(--mono);white-space:nowrap}
+.stance-defaults{margin:18px 0 26px}.stance-defaults figure{margin:0}.stance-defaults svg{display:block;width:100%;height:auto;min-width:580px;background:var(--cp-panel);border:1px solid var(--cp-line);border-radius:8px}.stance-defaults figure{overflow-x:auto}.sd-legend{display:flex;gap:20px;flex-wrap:wrap;margin:8px 0 10px;color:var(--cp-idle);font:600 11px var(--mono)}.sd-legend span{display:inline-flex;align-items:center;gap:7px}.sd-legend i{display:inline-block;width:18px;border-top:2px solid var(--cp-line)}.sd-legend .sd-return-key{border-top:2px dashed var(--cp-blue,#78a8ff)}.sd-grid{stroke:var(--cp-line);stroke-opacity:.5}.sd-axis{fill:var(--cp-idle);font:10px var(--mono)}.stance-defaults figcaption{margin-top:8px;color:var(--cp-idle);font:12px/1.45 var(--ui)}
 .tk{font:700 12px var(--mono);letter-spacing:.06em;color:var(--cp-neon);border:1px solid var(--cp-line);padding:3px 6px;text-decoration:none;min-height:24px;display:inline-flex;gap:6px;align-items:center}
 .tk .v{font-weight:700}
 .tk.pos .v{color:var(--cp-green)}.tk.neg .v{color:var(--cp-red)}.tk.neu .v{color:var(--cp-idle)}

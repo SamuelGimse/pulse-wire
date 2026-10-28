@@ -136,12 +136,43 @@
       `<p class="note">Move since publish uses the price stamped at publish (CF1/CF2-safe, js/calc.js); n/a when missing.</p>${PM.linksHtml(c)}${extrasHtml(c.tickers.map(t => t.ticker))}</div>` +
       `<div><h2>// Sources</h2><div class="src">${srcs}</div><h2>// Score record</h2><dl class="kv"><dt>Model</dt><dd>${esc(c.model_id)}</dd><dt>Rubric</dt><dd>${esc(c.rubric_version)}</dd><dt>Mapping</dt><dd>${esc(c.mapping_version)}</dd><dt>Scored at</dt><dd><time datetime="${esc(c.scored_at || c.published_at)}" title="${esc(c.scored_at || c.published_at)}">${dateOf(c.scored_at || c.published_at)} ${timeOf(c.scored_at || c.published_at)} Oslo</time></dd><dt>Calibration</dt><dd>${CAL}</dd></dl></div></div>`;
   }
+  function stanceDefaultsChart(st) {
+    const stanceValue = stance => ({ constructive: 1, bullish: 1, positive: 1, watch: 0, neutral: 0, cautious: -1, bearish: -1, negative: -1 })[String(stance || '').toLowerCase()] ?? null;
+    const reports = (st.dailyReports || []).map(report => {
+      const clusters = (report.clusters || []).filter(c => Array.isArray(c.defaultStocks) && c.defaultStocks.length);
+      const stances = clusters.map(c => stanceValue(c.stance)).filter(v => v != null), returns = clusters.map(c => {
+        const moves = c.defaultStocks.map(stock => Calc.pctChange(Calc.publishPrice(stock), stock.live)).filter(v => v != null);
+        return moves.length ? { value: moves.reduce((a, b) => a + b, 0) / moves.length, n: moves.length } : null;
+      }).filter(Boolean), t = Date.parse(report.updated_at || report.date);
+      return { t, stance: stances.length ? stances.reduce((a, b) => a + b, 0) / stances.length : null,
+        defaults: returns.length ? returns.reduce((a, b) => a + b.value, 0) / returns.length : null,
+        n: returns.reduce((a, b) => a + b.n, 0), groups: returns.length };
+    }).filter(p => Number.isFinite(p.t)).sort((a, b) => a.t - b.t);
+    if (reports.length < 2) return '<section class="stance-defaults"><h2>// Stance × cluster defaults</h2><p class="empty">Two reports with priced default stocks are needed to draw this chart.</p></section>';
+    const W = 820, H = 250, L = 48, R = 58, T = 30, B = 38, t0 = reports[0].t, span = Math.max(1, reports[reports.length - 1].t - t0),
+      x = t => L + ((t - t0) / span) * (W - L - R), values = reports.map(p => p.defaults).filter(v => v != null);
+    if (!values.length) return '<section class="stance-defaults"><h2>// Stance × cluster defaults</h2><p class="empty">No linked default-stock prices are available for these reports.</p></section>';
+    let lo = Math.min(0, ...values), hi = Math.max(0, ...values); if (hi - lo < 1) { lo -= 0.5; hi += 0.5; } else { const pad = (hi - lo) * 0.12; lo -= pad; hi += pad; }
+    const yStance = v => T + ((1 - v) / 2) * (H - T - B), yReturn = v => T + ((hi - v) / (hi - lo)) * (H - T - B);
+    const line = (field, y) => { let d = '', active = false; for (const p of reports) { const v = p[field]; if (v == null) { active = false; continue; } d += `${active ? ' L' : ' M'}${x(p.t).toFixed(1)},${y(v).toFixed(1)}`; active = true; } return d; };
+    const grid = Array.from({ length: 5 }, (_, i) => { const value = hi - (hi - lo) * i / 4, py = T + (H - T - B) * i / 4; return `<line class="sd-grid" x1="${L}" x2="${W - R}" y1="${py}" y2="${py}"/><text class="sd-axis" x="${W - R + 6}" y="${py + 4}">${value > 0 ? '+' : ''}${value.toFixed(1)}%</text>`; }).join('');
+    const dots = reports.map(p => { const color = p.stance > 0 ? 'var(--cp-green)' : p.stance < 0 ? 'var(--cp-red)' : 'var(--cp-idle)', stanceLabel = p.stance === 1 ? 'Constructive' : p.stance === -1 ? 'Cautious' : p.stance === 0 ? 'Watch' : p.stance > 0 ? 'Mixed, leaning constructive' : 'Mixed, leaning cautious';
+      const stanceDot = p.stance == null ? '' : `<circle cx="${x(p.t)}" cy="${yStance(p.stance)}" r="4" fill="${color}"><title>${esc(dateOf(p.t))}: stance ${stanceLabel}</title></circle>`;
+      const returnDot = p.defaults == null ? '' : `<circle cx="${x(p.t)}" cy="${yReturn(p.defaults)}" r="3.5" fill="var(--cp-blue,#78a8ff)"><title>${esc(dateOf(p.t))}: defaults ${pct(p.defaults)} since publish; ${p.n} priced stocks across ${p.groups} clusters</title></circle>`;
+      return stanceDot + returnDot; }).join('');
+    const labels = [reports[0], reports[Math.floor((reports.length - 1) / 2)], reports[reports.length - 1]].map((p, i) => `<text class="sd-axis" text-anchor="${i === 0 ? 'start' : i === 2 ? 'end' : 'middle'}" x="${x(p.t)}" y="${H - 10}">${esc(dateOf(p.t))}</text>`).join('');
+    return `<section class="stance-defaults"><h2>// Stance × cluster defaults</h2><div class="sd-legend"><span><i class="sd-stance-key"></i>Stance</span><span><i class="sd-return-key"></i>Defaults · since publish / live %</span></div>` +
+      `<figure><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Stance and linked cluster default stock return by report date">${grid}` +
+      `<text class="sd-axis" text-anchor="end" x="${L - 8}" y="${yStance(1) + 4}">C+</text><text class="sd-axis" text-anchor="end" x="${L - 8}" y="${yStance(0) + 4}">Watch</text><text class="sd-axis" text-anchor="end" x="${L - 8}" y="${yStance(-1) + 4}">C−</text>` +
+      `<path d="${line('stance', yStance)}" fill="none" stroke="var(--cp-line)" stroke-width="2"/><path d="${line('defaults', yReturn)}" fill="none" stroke="var(--cp-blue,#78a8ff)" stroke-width="2" stroke-dasharray="4 4"/>${dots}${labels}</svg>` +
+      `<figcaption>Each point is a report date. Stance is averaged across clusters (C+ constructive, C− cautious); dashed line is the mean default-stock move since publish using the latest stored quotes. Descriptive only.</figcaption></figure></section>`;
+  }
   function viewTrack(st) {
     const t = trackStats(st.track), f = st.filter;   // BC23: n === 0 -> rate and CI show n/a (not 0%)
     const rows = st.track.filter(x => Math.abs(x.s) >= 2).filter(x => f === 'hits' ? x.hit : f === 'misses' ? !x.hit : true)
       .map(x => `<tr><td>${x.date}</td><td>${esc(x.title)}</td><td>${I.chipHtml(x.ticker, x.s)}</td><td class="r">${fmtMinus(I.signText(x.s))}</td><td class="r ${x.move > 0 ? 'dpos' : 'dneg'}">${x.move > 0 ? '\u25B2' : '\u25BC'} ${pct(x.move)}</td><td>${x.hit ? '<span class="hit">\u2713 HIT</span>' : '<span class="miss">\u2715 MISS</span>'}</td></tr>`).join('');
     const bk = t.buckets.map(b => `<tr><td>${b.lo}\u2013${b.hi}</td><td class="r">${b.n}</td><td class="r hit">${b.hits}</td><td class="r miss">${b.misses}</td><td class="r">${b.medianAbsMove == null ? 'n/a' : b.medianAbsMove.toFixed(1) + '%'}</td></tr>`).join('');
-    return `<div class="head"><div><h1>&gt; Track record</h1><div class="sub">Same page for Free and Pro \u00b7 1-day move after publish \u00b7 |score| \u2265 2 \u00b7 SAMPLE numbers until B1/B2</div></div></div>` +
+    return `<div class="head"><div><h1>&gt; Track record</h1><div class="sub">Same page for Free and Pro \u00b7 1-day move after publish \u00b7 |score| \u2265 2 \u00b7 SAMPLE numbers until B1/B2</div></div></div>` + stanceDefaultsChart(st) +
       `<div class="stat"><div><b>${t.n}</b><span>Events</span></div><div><b>${t.hits}</b><span>Hits</span></div><div><b>${t.misses}</b><span>Misses</span></div><div><b>${t.n ? Math.round(100 * t.rate) + '%' : 'n/a'}</b><span>Hit rate \u00b7 95% CI ${t.n ? Math.round(100 * t.ci[0]) + '\u2013' + Math.round(100 * t.ci[1]) + '%' : 'n/a'}</span></div></div>` +
       `<h2>// By |score| bucket</h2><div class="tw"><table><thead><tr><th>|score|</th><th class="r">N</th><th class="r">Hits</th><th class="r">Misses</th><th class="r">Median |move|</th></tr></thead><tbody>${bk}</tbody></table></div>` +
       `<h2>// Events</h2><div class="filter"><div class="seg" role="group" aria-label="Filter">${['all', 'hits', 'misses'].map(m => `<button type="button" data-filter="${m}" aria-pressed="${f === m}">${m}</button>`).join('')}</div></div>` +
@@ -186,7 +217,7 @@
     const qs = new URLSearchParams(location.search), D = root.PulseData;
     const role = defaultRole(qs.get('tier'), root.PULSE_PACKAGE), paidDefault = !!(root.PULSE_PACKAGE && root.PULSE_PACKAGE.defaultTier === 'pro');
     const now = new Date(qs.get('now') || D.demoNow);
-    const st = { role, now, live: D.live === true, paidDefault, all: D.clusters, visible: forRole(D.clusters, role, now), track: D.track, movers: D.movers, marketMovers: D.marketMovers || null, history: D.remoteHistory || [], sort: 'impact', filter: 'all',
+    const st = { role, now, live: D.live === true, paidDefault, all: D.clusters, visible: forRole(D.clusters, role, now), track: D.track, dailyReports: D.dailyReports || [], movers: D.movers, marketMovers: D.marketMovers || null, history: D.remoteHistory || [], sort: 'impact', filter: 'all',
       watch: ['EQNR.OL', 'NVDA', 'TSLA', 'DNB.OL'].filter(s => !root.PULSE_MARKETS || root.PULSE_MARKETS.includes(root.PulseSource.marketOf(s))), hash: location.hash, theme: TH.read(root.localStorage) };
     const app = document.getElementById('app');
     const draw = () => { st.hash = location.hash || '#/feed'; app.innerHTML = render(st); if (/^#\/map(\/|$)/.test(st.hash)) PMAP.mount(document, st); };   // P0.8: map loads only on its view
