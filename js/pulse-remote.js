@@ -10,6 +10,7 @@
   const TIMEOUT_MS = 5000;
   // own pipeline rows only, newest first; the columns the legacy frontend reads (api.js fetchPublishes), groups_json holds our own words
   const QUERY = 'publishes?select=id,title,market,created_at,groups_json&notes=like.PULSE%20pipeline*&order=id.desc&limit=';
+  const LATEST_QUERY = 'publishes?select=id,title,market,created_at,groups_json,notes&notes=like.PULSE%20pipeline*&order=id.desc&limit=1';
   // should 40: the notes prefix alone can be spoofed by anyone who can insert, so only ids WE inserted are read: an allowlist generated
   // into the package config (window.PULSE_PACKAGE.ids, from supabase-write/insert-result.json). Prefix check kept too.
   // Future option (needs a schema change + user yes): an owner column with RLS, or a separate own table/view.
@@ -55,12 +56,22 @@
     return [...by.values()]; });
   /** GET all allowlisted own rows; resolves { clusters (newest row), history, updated_at } or rejects (HTTP error, timeout, bad JSON, no rows). */
   async function fetchLive(fetchImpl = root.fetch && root.fetch.bind(root), ids = allowIds()) {
-    if (!ids.length) throw new Error('no allowlisted publish ids');
     const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null, timer = ctl && setTimeout(() => ctl.abort(), TIMEOUT_MS);
     try {
-      const res = await fetchImpl(SUPABASE_URL + '/rest/v1/' + QUERY + ids.length + '&id=in.(' + ids.join(',') + ')', { headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: 'Bearer ' + SUPABASE_PUBLISHABLE_KEY, Accept: 'application/json' }, signal: ctl && ctl.signal });
-      if (!res.ok) throw new Error('Supabase HTTP ' + res.status);
-      const all = await res.json(), rows = (Array.isArray(all) ? all : []).filter(r => r && ids.includes(r.id)).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+      const headers = { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: 'Bearer ' + SUPABASE_PUBLISHABLE_KEY, Accept: 'application/json' }, requests = [];
+      if (ids.length) requests.push(SUPABASE_URL + '/rest/v1/' + QUERY + ids.length + '&id=in.(' + ids.join(',') + ')');
+      requests.push(SUPABASE_URL + '/rest/v1/' + LATEST_QUERY);
+      const results = await Promise.all(requests.map(async url => {
+        const res = await fetchImpl(url, { headers, signal: ctl && ctl.signal });
+        if (!res.ok) throw new Error('Supabase HTTP ' + res.status);
+        return res.json();
+      }));
+      const allowed = new Set(ids), unique = new Map();
+      for (const result of results) for (const row of (Array.isArray(result) ? result : [])) {
+        if (!row || !Number.isInteger(row.id) || !Array.isArray(row.groups_json)) continue;
+        if (allowed.has(row.id) || (typeof row.notes === 'string' && row.notes.startsWith('PULSE pipeline'))) unique.set(row.id, row);
+      }
+      const rows = [...unique.values()].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id - a.id);
       if (!rows.length) throw new Error('no live rows');
       const CL = typeof module !== 'undefined' && module.exports ? require('./pulse-clusters.js') : root.PulseClusters, pkg = root.PULSE_PACKAGE;
       const marketMovers = rows.map(marketMoversOf).find(Boolean) || null, liveQuotes = marketMovers && marketMovers.quotes || {};
