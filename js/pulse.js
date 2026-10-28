@@ -59,6 +59,7 @@
   }
   const fmtMinus = s => String(s).replace(/^-/, '\u2212');
   const pct = v => (v == null ? 'n/a' : (v > 0 ? '+' : v < 0 ? '\u2212' : '') + Math.abs(v).toFixed(2) + '%');
+  const fmtPrice = v => { const n = Calc.validPrice(v); return n == null ? 'n/a' : n.toFixed(2); };
 
   // ---- views ----
   // N1 (sir-nitpickalot r2): the free/Pro split here is client-side on sample data, so it is NOT a paywall; the real one is backend RLS.
@@ -127,11 +128,11 @@
     const c = st.visible.find(x => x.id === id);
     if (!c) return `<a class="back" href="#/feed">\u2190 Clusters</a><h1>&gt; Not available</h1><p class="note">This cluster is not in your tier\u2019s data (free: the previous trading day only).</p>${st.role === 'free' ? paywall(1) : ''}`;
     const rows = c.tickers.map(t => { const mv = Calc.pctChange(Calc.publishPrice(t), t.live);
-      return `<tr><td class="tcol">${I.chipHtml(t.ticker, null)}</td><td class="r">${I.arrow(I.clamp(t.s))} ${fmtMinus(I.signText(I.clamp(t.s)))}</td><td>${esc(t.evidence)}</td><td>${esc(t.novelty)}</td><td class="r ${mv > 0 ? 'dpos' : mv < 0 ? 'dneg' : 'dneu'}">${mv == null ? 'n/a' : (mv > 0 ? '\u25B2 ' : mv < 0 ? '\u25BC ' : '\u25CF ') + pct(mv)}</td></tr>`; }).join('');
+      return `<tr><td class="tcol">${I.chipHtml(t.ticker, null)}</td><td class="r">${I.arrow(I.clamp(t.s))} ${fmtMinus(I.signText(I.clamp(t.s)))}</td><td>${esc(t.evidence)}</td><td>${esc(t.novelty)}</td><td class="r">${fmtPrice(Calc.publishPrice(t))}</td><td class="r">${fmtPrice(t.live && t.live.price)}</td><td class="r ${mv > 0 ? 'dpos' : mv < 0 ? 'dneg' : 'dneu'}">${mv == null ? 'n/a' : (mv > 0 ? '\u25B2 ' : mv < 0 ? '\u25BC ' : '\u25CF ') + pct(mv)}</td></tr>`; }).join('');
     const srcs = (c.sourcesList || []).map(s => `<div>${esc(s.title)}<small>${esc(s.outlet)} \u00b7 ${esc(s.at)}${s.primary ? ' \u00b7 PRIMARY' : ''}</small>${readLink(s.url)}</div>`).join('') || `<p class="sub">${c.sources} sources (list not in sample).</p>`;
     return `<a class="back" href="#/feed">\u2190 Clusters</a><div class="head"><div><h1>&gt; Cluster</h1><div class="sub">${dateOf(c.published_at)} ${timeOf(c.published_at)} Oslo \u00b7 ${c.market} \u00b7 ${esc(c.sector)}</div></div></div>` +
       `<div class="list"><article class="card hero ${I.tone(c.s)}">${I.badgeHtml(c.s)}<div><h3>${esc(c.title)}</h3><p>${esc(c.summary)}</p></div></article></div>` +
-      `<div class="det-grid"><div><h2>// Linked tickers</h2><div class="tw"><table><thead><tr><th>Ticker</th><th class="r">Impact</th><th>Evidence</th><th>Novelty</th><th class="r">Move since publish</th></tr></thead><tbody>${rows}</tbody></table></div>` +
+      `<div class="det-grid"><div><h2>// Linked tickers</h2><div class="tw"><table><thead><tr><th>Ticker</th><th class="r">Impact</th><th>Evidence</th><th>Novelty</th><th class="r">At publish</th><th class="r">Live</th><th class="r">Since publish</th></tr></thead><tbody>${rows}</tbody></table></div>` +
       `<p class="note">Move since publish uses the price stamped at publish (CF1/CF2-safe, js/calc.js); n/a when missing.</p>${PM.linksHtml(c)}${extrasHtml(c.tickers.map(t => t.ticker))}</div>` +
       `<div><h2>// Sources</h2><div class="src">${srcs}</div><h2>// Score record</h2><dl class="kv"><dt>Model</dt><dd>${esc(c.model_id)}</dd><dt>Rubric</dt><dd>${esc(c.rubric_version)}</dd><dt>Mapping</dt><dd>${esc(c.mapping_version)}</dd><dt>Scored at</dt><dd><time datetime="${esc(c.scored_at || c.published_at)}" title="${esc(c.scored_at || c.published_at)}">${dateOf(c.scored_at || c.published_at)} ${timeOf(c.scored_at || c.published_at)} Oslo</time></dd><dt>Calibration</dt><dd>${CAL}</dd></dl></div></div>`;
   }
