@@ -60,8 +60,8 @@
   function articlesHtml(c) {
     if (!Array.isArray(c.articles)) return '<p class="sub">No article list stored for this publish</p>';
     const id = `arts${++artN}`, a = c.articles;
-    return `<button type="button" class="btn sec toggle toggle-arts" aria-expanded="false" aria-controls="${id}" data-open="Hide articles (${a.length})" data-closed="Show articles (${a.length})">Show articles (${a.length})</button>` +
-      `<div class="arts" id="${id}" hidden>${a.map(x => { const u = safeUrl(x.link);
+    return `<button type="button" class="btn sec toggle toggle-arts" aria-expanded="true" aria-controls="${id}" data-open="Hide articles (${a.length})" data-closed="Show articles (${a.length})">Hide articles (${a.length})</button>` +
+      `<div class="arts" id="${id}">${a.map(x => { const u = safeUrl(x.link);
         return `<article class="art"><div class="art-head"><h4>${esc(x.title)}</h4>${ratingHtml(x.rating)}</div><p class="sub">${esc(x.source)}${x.date ? ` \u00b7 ${esc(x.date)}` : ''}</p>${x.short_summary ? `<p>${esc(x.short_summary)}</p>` : ''}` +
           (u ? `<a class="read" href="${esc(u)}" target="_blank" rel="noopener noreferrer">Read \u2192</a>` : '') + '</article>'; }).join('')}</div>`;
   }
