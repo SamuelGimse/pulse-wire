@@ -71,7 +71,7 @@
   const DISC = 'Scores describe the expected size of a news story\u2019s market effect, from \u221210 to +10 on an exponential scale (each step \u2248 \u00d71.41, every 2 steps \u00d72). Calibration pending: the scale is not yet fitted to measured moves. Not investment advice. Past results do not predict future moves.';
   // t338: the footer names the source of what THIS view shows (feed vs history vs sample-only views)
   const srcNote = (view, st) => (['themes', 'theme', 'archive'].includes(view) ? (PH_DATA() && PH_DATA().sample === false ? 'Themes and archive: stored publishes.' : 'Sample data.')
-    : view === 'movers' ? 'Sample movers (no live quotes yet).' : ['feed', 'cluster', 'ticker', 'map', undefined, ''].includes(view) ? (st.live === true ? 'Feed: our latest run.' : 'Sample data.') : 'Sample data.');
+    : view === 'movers' ? 'Sample movers (no live quotes yet).' : ['feed', 'cluster', 'ticker', 'map', undefined, ''].includes(view) ? (st.live === true ? 'Feed: stored daily reports.' : 'Sample data.') : 'Sample data.');
   const PH_DATA = () => (isNode ? require('./pulse-history-data.js') : root.PulseHistoryData);
   const CAL = '<span class="cal">\u25C6 Calibration pending</span>';
   const timeOf = iso => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Oslo' });
@@ -106,14 +106,22 @@
       (st.movers ? PM.railHtml(st) : '') +   // P0.6: replaces the A8 panel (design-pg7 v2 §3)
       `<h2>// How to read</h2><p class="sub">Sign + arrow + word give the direction; the meter grows \u00d72 every 2 steps. Hits and misses are on the track record.</p>`;
   }
-  function viewFeed(st) {
+  function viewFeed(st, requestedDay) {
+    const reports = Array.isArray(root.PulseData.dailyReports) ? root.PulseData.dailyReports : [];
+    if (requestedDay) st.reportDay = requestedDay;
+    const report = reports.find(x => x.date === st.reportDay) || reports[0];
+    if (report) { st.reportDay = report.date; st.visible = forRole(report.clusters, st.role, st.now); st.all = report.clusters; }
     const list = sortClusters(st.visible, st.sort);
     const lockedN = st.role === 'free' ? st.all.length - st.visible.length : 0;
-    const head = `<div class="head"><div><h1>Today’s clusters</h1><div class="sub">${st.role === 'free' ? 'Free \u00b7 previous trading day only' : st.live === true ? 'Live market feed' : 'Sample feed'} \u00b7 sorted by ${st.sort === 'impact' ? 'impact' : st.sort} \u00b7 ${list.length} shown</div></div><span class="sp"></span>` +
+    const dayLabel = report ? report.date : 'Latest';
+    const dayNav = reports.length ? `<div class="report-days"><button class="btn sec" type="button" data-report-step="older" ${reports.findIndex(x => x.date === dayLabel) >= reports.length - 1 ? 'disabled' : ''}>← Older</button>` +
+      `<label class="sr" for="report-day">Report day</label><select id="report-day" data-report-day aria-label="Choose report day">${reports.map(x => `<option value="${esc(x.date)}" ${x.date === dayLabel ? 'selected' : ''}>${esc(x.date)} · ${x.clusters.length} clusters</option>`).join('')}</select>` +
+      `<button class="btn sec" type="button" data-report-step="newer" ${reports.findIndex(x => x.date === dayLabel) <= 0 ? 'disabled' : ''}>Newer →</button></div>` : '';
+    const head = `<div class="head"><div><h1>${report ? `Clusters · ${esc(dayLabel)}` : 'Today’s clusters'}</h1><div class="sub">${st.role === 'free' ? 'Free · previous trading day only' : st.live === true ? `Live report · ${esc(dayLabel)}` : 'Sample feed'} · sorted by ${st.sort === 'impact' ? 'impact' : st.sort} · ${list.length} shown</div></div><span class="sp"></span>` +
       `<div class="seg" role="group" aria-label="Sort">${['impact', 'newest', 'coverage'].map(m => `<button type="button" data-sort="${m}" aria-pressed="${st.sort === m}">${m}</button>`).join('')}</div></div>`;
     const cards = CL.cardsHtml(list, Object.assign({ themes: PH_DATA().themes, markets: root.PULSE_MARKETS, clusterMap: (root.PULSE_PACKAGE || {}).clusterMap }, st));
-    const body = (list.length ? '' : `<div class="empty">No clusters from the previous trading day.</div>`) + cards;
-    return PM.viewSeg('feed') + head + `<div class="list">${lockedN ? paywall(lockedN) : ''}${body}</div>`;
+    const body = (list.length ? '' : `<div class="empty">No clusters for this report day.</div>`) + cards;
+    return PM.viewSeg('feed') + dayNav + head + `<div class="list">${lockedN ? paywall(lockedN) : ''}${body}</div>`;
   }
   function viewCluster(st, id) {
     const c = st.visible.find(x => x.id === id);
@@ -152,7 +160,7 @@
     const main = view === 'cluster' ? viewCluster(st, decodeURIComponent(arg || '')) : view === 'track' ? viewTrack(st)
       : view === 'more' ? TH.viewMore(st) : view === 'map' ? PMAP.viewMap(st, decodeURIComponent(arg || ''))
       : view === 'movers' ? PM.viewMovers(st, arg, arg2) : view === 'archive' ? AR.viewArchive(st, decodeURIComponent(arg || '')) : view === 'summary' ? SU.viewSummary(st) : view === 'themes' ? PH.viewThemes(st) : view === 'theme' ? PH.viewTheme(st, decodeURIComponent(arg || ''))
-      : view === 'ticker' ? viewTicker(st, decodeURIComponent(arg || '')) : view === 'watchlist' ? viewWatch(st) : view === 'account' ? viewAccount(st) : viewFeed(st);
+      : view === 'ticker' ? viewTicker(st, decodeURIComponent(arg || '')) : view === 'watchlist' ? viewWatch(st) : view === 'account' ? viewAccount(st) : viewFeed(st, view === 'feed' ? decodeURIComponent(arg || '') : '');
     const cur = view === 'track' ? 'track' : view === 'themes' || view === 'theme' ? 'themes' : view === 'summary' ? 'summary' : view === 'archive' ? 'archive' : view === 'movers' ? 'movers' : view === 'map' ? 'map' : view === 'more' || view === 'account' ? 'more' : view === 'watchlist' ? 'watchlist' : view === 'account' ? 'account' : 'feed';
     const nav = [['feed', 'Clusters', 'Clusters'], ['movers', 'Movers', 'Movers'], ['summary', 'Daily summary', 'Brief'], ['map', 'World map', 'Map'], ['archive', 'Days', 'Days'], ['track', 'Track record', 'Track'], ['watchlist', 'Watchlist', 'Watch'], ['more', 'More', 'More']];
     const phone = nav.filter(([k]) => ['feed', 'track', 'watchlist', 'more'].includes(k));   // design-pg10 §5: 4 phone tabs
@@ -184,10 +192,13 @@
     CL.wire(app);
     TH.wire(document, root.localStorage, () => { st.theme = TH.read(root.localStorage); draw(); });
     app.addEventListener('click', e => {
+      const step = e.target.closest('button[data-report-step]');
+      if (step && !step.disabled) { const reports = root.PulseData.dailyReports || [], i = reports.findIndex(x => x.date === st.reportDay), next = reports[i + (step.dataset.reportStep === 'older' ? 1 : -1)]; if (next) location.hash = `#/feed/${next.date}`; return; }
       const b = e.target.closest('button[data-sort],button[data-filter]'); if (!b) return;
       if (b.dataset.sort) st.sort = b.dataset.sort; else st.filter = b.dataset.filter;
       draw(); const again = app.querySelector(`button[data-${b.dataset.sort ? 'sort' : 'filter'}="${b.dataset.sort || b.dataset.filter}"]`); if (again) again.focus();
     });
+    app.addEventListener('change', e => { if (e.target.matches('select[data-report-day]')) location.hash = `#/feed/${e.target.value}`; });
     window.addEventListener('hashchange', () => { draw(); window.scrollTo(0, 0); });
     draw();
   }

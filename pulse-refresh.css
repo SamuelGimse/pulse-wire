@@ -96,6 +96,9 @@ h1 { color: var(--cp-text); font: 700 clamp(27px, 3vw, 35px)/1.1 var(--ui); lett
 h2 { margin: 28px 0 12px; color: var(--cp-idle); font: 700 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
 .head { align-items: end; margin: 18px 0 22px; gap: 18px; }
 .head .sub { margin-top: 8px; color: var(--cp-idle); font: 13px/1.45 var(--ui); letter-spacing: 0; }
+.report-days { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.report-days select { min-height: 38px; max-width: 100%; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--cp-text); background: var(--cp-panel); font: 600 13px var(--mono); }
+.report-days button:disabled { opacity: .4; cursor: default; }
 .preview-note {
   display: inline-flex;
   margin: 0 0 18px;
@@ -262,6 +265,8 @@ h2 { margin: 28px 0 12px; color: var(--cp-idle); font: 700 11px var(--mono); let
   main { padding: 20px 16px 40px; }
   h1 { font-size: 28px; }
   .head { align-items: flex-start; gap: 12px; }
+  .report-days { margin: 10px 0 14px; }
+  .report-days select { flex: 1; min-width: 135px; }
   .head>.sp { display: none; }
   .seg button { min-height: 34px; }
   .card, .card.group { padding: 16px; border-radius: 12px; }

@@ -18,6 +18,7 @@
   const syms = list => (Array.isArray(list) ? list.map(x => String((x && x.symbol) || x || '')).filter(Boolean) : []);
   const num = v => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-10, Math.min(10, Math.round(v))) : 0);
   const str = v => (typeof v === 'string' ? v : '');
+  const dayKey = iso => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Europe/Oslo' });
   // t344s1271: only the 5 article fields, strings only; no articles[] stays undefined ('No article list stored')
   const arts = a => (Array.isArray(a) ? a.filter(x => x && typeof x === 'object').map(x => ({ title: str(x.title), source: str(x.source), date: str(x.date), link: str(x.link), short_summary: str(x.short_summary), ...(Number.isInteger(x.rating) && x.rating >= -10 && x.rating <= 10 ? { rating: x.rating } : {}) })) : undefined);
   /** One publishes row -> PULSE clusters. Own-words fields plus articles[] when stored. */
@@ -43,10 +44,16 @@
     try {
       const res = await fetchImpl(SUPABASE_URL + '/rest/v1/' + QUERY + ids.length + '&id=in.(' + ids.join(',') + ')', { headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: 'Bearer ' + SUPABASE_PUBLISHABLE_KEY, Accept: 'application/json' }, signal: ctl && ctl.signal });
       if (!res.ok) throw new Error('Supabase HTTP ' + res.status);
-      const all = await res.json(), rows = (Array.isArray(all) ? all : []).filter(r => r && ids.includes(r.id)), clusters = rows.length ? toClusters(rows[0]) : [];   // allowlist again client-side; newest row = the feed
+      const all = await res.json(), rows = (Array.isArray(all) ? all : []).filter(r => r && ids.includes(r.id)).sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+      const clusters = rows.length ? toClusters(rows[0]) : [];   // newest row = default feed
       if (!clusters.length) throw new Error('no live rows');
       const CL = typeof module !== 'undefined' && module.exports ? require('./pulse-clusters.js') : root.PulseClusters, pkg = root.PULSE_PACKAGE;
-      return { clusters, history: historyOf(rows, CL, pkg && pkg.clusterMap), updated_at: rows[0].created_at };
+      const byDay = new Map();
+      for (const row of rows) {
+        const date = dayKey(row.created_at);
+        if (!byDay.has(date)) byDay.set(date, { date, publish_id: row.id, title: str(row.title), market: str(row.market || 'US'), updated_at: row.created_at, clusters: toClusters(row) });
+      }
+      return { clusters, dailyReports: [...byDay.values()], history: historyOf(rows, CL, pkg && pkg.clusterMap), updated_at: rows[0].created_at };
     } finally { if (timer) clearTimeout(timer); }
   }
   /** Fill PulseData from Supabase (live) or keep the sample (fallback). Always resolves; true = live. */
@@ -54,7 +61,7 @@
     try {
       const r = await fetchLive(fetchImpl), PS = root.PulseSource;
       PS.applyStore(data, { live: true, clusters: r.clusters, updated_at: r.updated_at, charts: {} });
-      PS.applyMarkets(root.PULSE_MARKETS, data); data.remoteHistory = r.history;
+      PS.applyMarkets(root.PULSE_MARKETS, data); data.remoteHistory = r.history; data.dailyReports = r.dailyReports;
       return data.live === true;
     } catch (e) { if (root.console) root.console.warn('Live feed unavailable, showing sample data:', e.message); return false; }
   }
