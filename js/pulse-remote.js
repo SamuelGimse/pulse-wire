@@ -20,16 +20,21 @@
   const num = v => (typeof v === 'number' && Number.isFinite(v) ? Math.max(-10, Math.min(10, Math.round(v))) : 0);
   const str = v => (typeof v === 'string' ? v : '');
   const dayKey = iso => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'Europe/Oslo' });
+  const averageRating = articles => {
+    const scores = (Array.isArray(articles) ? articles : []).map(x => x && x.rating).filter(x => Number.isInteger(x) && x >= -10 && x <= 10);
+    return scores.length ? Math.max(-10, Math.min(10, Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length))) : null;
+  };
   // t344s1271: only the 5 article fields, strings only; no articles[] stays undefined ('No article list stored')
   const arts = a => (Array.isArray(a) ? a.filter(x => x && typeof x === 'object').map(x => ({ title: str(x.title), source: str(x.source), date: str(x.date), link: str(x.link), short_summary: str(x.short_summary), ...(Number.isInteger(x.rating) && x.rating >= -10 && x.rating <= 10 ? { rating: x.rating } : {}) })) : undefined);
   /** One publishes row -> PULSE clusters. Own-words fields plus articles[] when stored. */
   function toClusters(row, liveQuotes = {}) {
     return (Array.isArray(row.groups_json) ? row.groups_json : []).filter(g => g && g.name && g.summary).map((g, i) => {
-      const s = num(g.impact_score), a = arts(g.articles), rows = [g.stocks, g.direct_stocks, g.mentioned_stocks, g.close_stocks, g.related_stocks].flatMap(list => Array.isArray(list) ? list : []).map(x => typeof x === 'string' ? { symbol: x } : x).filter(x => x && x.symbol), bySymbol = new Map(rows.map(x => [String(x.symbol).toUpperCase(), x]));
+      const a = arts(g.articles), articleAverage = averageRating(g.articles), s = articleAverage == null ? num(g.cluster_score ?? g.impact_score) : articleAverage, rows = [g.stocks, g.direct_stocks, g.mentioned_stocks, g.close_stocks, g.related_stocks].flatMap(list => Array.isArray(list) ? list : []).map(x => typeof x === 'string' ? { symbol: x } : x).filter(x => x && x.symbol), bySymbol = new Map(rows.map(x => [String(x.symbol).toUpperCase(), x]));
+      const stance = articleAverage == null ? String(g.stance || '') : s > 0 ? 'constructive' : s < 0 ? 'cautious' : 'watch';
       const mentioned = [...new Set([...syms(g.direct_stocks), ...syms(g.mentioned_stocks), ...syms(g.close_stocks), ...syms(g.stocks), ...syms(g.related_stocks)])], dflt = syms(g.fixed_stocks).filter(x => !mentioned.includes(x));
       const defaultStocks = (g.fixed_stocks || []).map(x => { const stock = x && typeof x === 'object' ? x : { symbol: x }, symbol = String(stock.symbol || '').toUpperCase(), saved = bySymbol.get(symbol), quote = liveQuotes[symbol] || liveQuotes[symbol.replace(/\.[A-Z]+$/, '')]; return { symbol, priceAtPublish: stock.priceAtPublish ?? stock.price_at_publish ?? (saved && (saved.priceAtPublish ?? saved.price_at_publish)) ?? null, live: quote && Number.isFinite(Number(quote.price)) ? { price: Number(quote.price) } : null }; }).filter(x => x.symbol);
       return { id: `sb-${row.id}-${i}`, market: String(row.market || g.market || 'US'), published_at: row.created_at, s, title: String(g.name), summary: String(g.summary),
-        sector: String(g.theme || 'Event'), sources: num(g.count) || 1, n_entries: num(g.count) || 1, ours: true, stance: String(g.stance || ''),
+        sector: String(g.theme || 'Event'), sources: num(g.count) || 1, n_entries: num(g.count) || 1, ours: true, stance,
         tickers: mentioned.map(t => { const stock = bySymbol.get(t), quote = liveQuotes[t] || liveQuotes[t.replace(/\.[A-Z]+$/, '')]; return { ticker: t, s, evidence: '', novelty: 'new', priceAtPublish: stock && (stock.priceAtPublish ?? stock.price_at_publish) != null ? Number(stock.priceAtPublish ?? stock.price_at_publish) : stock && Number.isFinite(Number(stock.price)) ? Number(stock.price) : null, live: quote && Number.isFinite(Number(quote.price)) ? { price: Number(quote.price) } : null }; }), defaultStocks,
         links: { default: dflt, mentioned }, sourcesList: [], cluster_id: g.cluster_id ? String(g.cluster_id) : undefined, kind: String(g.kind || ''),
         articles: a && a.length ? a : undefined, url: GOV.test(String(g.url || '')) ? g.url : undefined,
@@ -95,7 +100,7 @@
       return data.live === true;
     } catch (e) { if (root.console) root.console.warn('Live feed unavailable, showing sample data:', e.message); return false; }
   }
-  const api = { toClusters, marketMoversOf, historyOf, fetchLive, apply, allowIds, SUPABASE_URL, QUERY };
+  const api = { toClusters, averageRating, marketMoversOf, historyOf, fetchLive, apply, allowIds, SUPABASE_URL, QUERY };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.PulseRemote = api;
 })(typeof window !== 'undefined' ? window : globalThis);
